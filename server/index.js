@@ -4,6 +4,7 @@ const next = require("next");
 
 const { createAccessGate } = require("./access-gate");
 const { createGatewayProxy } = require("./gateway-proxy");
+const { createSavanaWsProxy } = require("./savana-ws-proxy");
 const { assertPublicHostAllowed, resolveHosts } = require("./network-policy");
 const { loadUpstreamGatewaySettings } = require("./studio-settings");
 
@@ -109,9 +110,24 @@ async function main() {
   // not complete the HMR handshake in Next 16. We keep Next's listener but wrap
   // it so it never touches the gateway proxy path (see attachUpgradeHandlers).
   const serversWithNextUpgrade = new WeakSet();
+  const savanaWsProxy = createSavanaWsProxy({
+    port: Number.parseInt(process.env.SAVANA_API_PORT ?? "3100", 10) || 3100,
+  });
+  const isProxiedPath = (url) => {
+    const pathname = resolvePathname(url);
+    return pathname === "/api/gateway/ws" || pathname === "/api/savana/ws";
+  };
   const handleServerUpgrade = (req, socket, head) => {
     if (resolvePathname(req.url) === "/api/gateway/ws") {
       proxy.handleUpgrade(req, socket, head);
+      return;
+    }
+    if (resolvePathname(req.url) === "/api/savana/ws") {
+      if (!accessGate.allowUpgrade(req)) {
+        socket.end("HTTP/1.1 401 Unauthorized\r\n\r\n");
+        return;
+      }
+      savanaWsProxy.handleUpgrade(req, socket, head);
       return;
     }
     if (socket.server && serversWithNextUpgrade.has(socket.server)) return;
@@ -141,7 +157,7 @@ async function main() {
       process.nextTick(() => {
         server.removeListener("upgrade", listener);
         const wrapped = (req, socket, head) => {
-          if (resolvePathname(req.url) === "/api/gateway/ws") return;
+          if (isProxiedPath(req.url)) return;
           listener.call(server, req, socket, head);
         };
         wrapped.__claw3dWrapped = true;

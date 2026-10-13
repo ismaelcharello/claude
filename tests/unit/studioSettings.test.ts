@@ -170,7 +170,7 @@ describe("studio settings normalization", () => {
     );
     expect(normalized.office.bad).toEqual(
       expect.objectContaining({
-        title: "Luke Headquarters",
+        title: "Savana Command Center",
       }),
     );
   });

@@ -5,6 +5,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "node server/index.js --dev",
+    "savana": "node scripts/savana-start.mjs",
+    "savana:demo": "node scripts/savana-start.mjs --demo",
+    "savana:api": "node --import tsx savana/server/main.ts",
     "dev:https": "node server/index.js --dev --https",
     "hermes-adapter": "node server/hermes-gateway-adapter.js",
     "demo-gateway": "node server/demo-gateway-adapter.js",
@@ -18,7 +21,8 @@
     "smoke:dev-server": "node scripts/smoke-dev-server.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "test:savana": "vitest run tests/unit/savanaService.test.ts"
   },
   "dependencies": {
     "@noble/ed25519": "^3.0.0",

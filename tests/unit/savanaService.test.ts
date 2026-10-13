@@ -12,7 +12,7 @@ type App = ReturnType<typeof createSavanaApp>;
 const apps: App[] = [];
 
 const makeApp = (env: Record<string, string> = {}) => {
-  const config = loadConfig({ SAVANA_DATA_DIR: "/tmp/savana-test", ...env } as NodeJS.ProcessEnv);
+  const config = loadConfig({ SAVANA_DATA_DIR: "/tmp/savana-test", ...env } as unknown as NodeJS.ProcessEnv);
   const app = createSavanaApp(config, { dbPath: ":memory:" });
   apps.push(app);
   return app;

@@ -14,6 +14,9 @@ import { RetroOffice3D } from "@/features/retro-office/RetroOffice3D";
 import type { OfficeAgent } from "@/features/retro-office/core/types";
 import { RunningAvatarLoader } from "@/features/agents/components/RunningAvatarLoader";
 import { useStructuralSharing } from "@/hooks/useStructuralSharing";
+import { SavanaOfficeOverlay } from "@/features/savana/components/SavanaOfficeOverlay";
+import { isSavanaOfficeEnabled, SAVANA_OFFICE_ENABLED } from "@/lib/savana/office";
+import { getAgentDefinition } from "@/lib/savana/agents";
 import { GatewayConnectScreen } from "@/features/agents/components/GatewayConnectScreen";
 import { useAgentStore, type AgentState } from "@/features/agents/state/store";
 import {
@@ -211,6 +214,8 @@ import type { StandupAgentSnapshot } from "@/lib/office/standup/types";
 import type { SkillStatusEntry } from "@/lib/skills/types";
 
 const stringToColor = (str: string) => {
+  const savanaColor = getAgentDefinition(str)?.color;
+  if (savanaColor) return savanaColor;
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
@@ -1072,6 +1077,10 @@ export function OfficeScreen({
   const [selectedChatAgentId, setSelectedChatAgentId] = useState<string | null>(
     null,
   );
+  const [savanaSelection, setSavanaSelection] = useState<{ agentId: string | null; nonce: number }>({
+    agentId: null,
+    nonce: 0,
+  });
   const [remoteChatByAgentId, setRemoteChatByAgentId] = useState<
     Record<string, RemoteChatSessionState>
   >({});
@@ -2732,6 +2741,19 @@ export function OfficeScreen({
     if (status !== "connected" || agentsLoaded) return;
     void loadAgents({ forceSettings: true });
   }, [agentsLoaded, loadAgents, status]);
+
+  // While disconnected in demo mode the office shows a placeholder "Main"
+  // agent and marks agents as loaded. Once the gateway connects, replace the
+  // placeholder with the gateway's real roster.
+  const onlyDemoPlaceholderAgent =
+    state.agents.length === 1 &&
+    state.agents[0]?.agentId === MAIN_AGENT_ID &&
+    state.agents[0]?.sessionKey === DEMO_MAIN_SESSION_KEY;
+  useEffect(() => {
+    if (status !== "connected" || state.loading) return;
+    if (!onlyDemoPlaceholderAgent) return;
+    void loadAgents({ forceSettings: true });
+  }, [loadAgents, onlyDemoPlaceholderAgent, state.loading, status]);
 
   useEffect(() => {
     if (status !== "connected") return;
@@ -4732,11 +4754,11 @@ export function OfficeScreen({
     <main className="relative h-full w-full overflow-hidden bg-black">
       {showGatewayLoadingOverlay ? (
         <div
-          className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-[#120a05]/76"
+          className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-[#0b130e]/76"
           aria-label="Connecting to runtime"
           role="status"
         >
-          <div className="rounded-xl border border-amber-700/45 bg-[#1a1008] px-8 py-6 shadow-2xl">
+          <div className="rounded-xl border border-amber-700/45 bg-[#0e1813] px-8 py-6 shadow-2xl">
             <RunningAvatarLoader
               size={28}
               trackWidth={76}
@@ -4747,8 +4769,8 @@ export function OfficeScreen({
         </div>
       ) : null}
       {showGatewayConnectOverlay ? (
-        <div className="pointer-events-auto absolute inset-0 z-50 flex items-start justify-center bg-[#120a05]/76 px-4 py-10">
-          <div className="w-full max-w-[860px] rounded-2xl border border-amber-900/55 bg-[#120a05]/98 p-3 shadow-2xl">
+        <div className="pointer-events-auto absolute inset-0 z-50 flex items-start justify-center bg-[#0b130e]/76 px-4 py-10">
+          <div className="w-full max-w-[860px] rounded-2xl border border-amber-900/55 bg-[#0b130e]/98 p-3 shadow-2xl">
             <GatewayConnectScreen
               gatewayUrl={gatewayUrl}
               token={token}
@@ -4767,20 +4789,25 @@ export function OfficeScreen({
           </div>
         </div>
       ) : null}
-      <OfficeFloorNav
-        activeFloorId={activeFloor.id}
-        floorRosterCache={floorRosterCache}
-        onSelectFloor={(floorId) => {
-          void handleSelectFloor(floorId);
-        }}
-        activeAdapterType={(selectedAdapterType as FloorProvider) ?? null}
-      />
+      {/* Savana has a single office, so the multi-runtime floor directory is hidden. */}
+      {!isSavanaOfficeEnabled(gatewayUrl) ? (
+        <OfficeFloorNav
+          activeFloorId={activeFloor.id}
+          floorRosterCache={floorRosterCache}
+          onSelectFloor={(floorId) => {
+            void handleSelectFloor(floorId);
+          }}
+          activeAdapterType={(selectedAdapterType as FloorProvider) ?? null}
+        />
+      ) : null}
       <section className="relative h-full min-h-0 min-w-0 overflow-hidden">
         <RetroOffice3D
           key={activeFloor.id}
           agents={allVisibleAgents}
           storageNamespace={activeFloor.id}
-          layoutPreset={activeFloor.kind === "lobby" ? "lobby" : "office"}
+          layoutPreset={
+            activeFloor.kind === "lobby" && !SAVANA_OFFICE_ENABLED ? "lobby" : "office"
+          }
           officeCenterSignal={officeCameraCenterSignal}
           animationState={officeAnimationState}
           deskAssignmentByDeskUid={deskAssignmentByDeskUid}
@@ -4869,7 +4896,9 @@ export function OfficeScreen({
             }
           }}
           onAgentChatSelect={(agentId) => {
-            handleOpenAgentChat(agentId);
+            setSavanaSelection((current) => ({ agentId, nonce: current.nonce + 1 }));
+            // In Savana the click opens the agent card; chat stays on the CHAT button.
+            if (!SAVANA_OFFICE_ENABLED) handleOpenAgentChat(agentId);
           }}
           onAddAgent={handleOpenCreateAgentWizard}
           onAgentEdit={(agentId) => {
@@ -4923,6 +4952,12 @@ export function OfficeScreen({
             void taskBoard.refreshCronJobs();
           }}
         />
+        {isSavanaOfficeEnabled(gatewayUrl) ? (
+          <SavanaOfficeOverlay
+            selectedAgentId={savanaSelection.agentId}
+            selectionNonce={savanaSelection.nonce}
+          />
+        ) : null}
         {jukeboxOpen ? (
           soundclawReady ? (
             <JukeboxPanel
@@ -5410,7 +5445,7 @@ export function OfficeScreen({
       >
         {chatOpen && (
           <div
-            className="flex overflow-hidden rounded border border-white/10 bg-[#0e0a04] shadow-2xl"
+            className="flex overflow-hidden rounded border border-white/10 bg-[#08100c] shadow-2xl"
             style={{
               width: chatRosterCollapsed
                 ? "min(680px, calc(100vw - 1.5rem))"
@@ -5640,7 +5675,7 @@ export function OfficeScreen({
         <button
           type="button"
           onClick={() => setChatOpen((prev) => !prev)}
-          className="flex items-center gap-1.5 rounded border border-amber-700/50 bg-[#0e0a04]/90 px-3 py-1.5 font-mono text-[11px] font-medium tracking-wider text-amber-500/80 shadow-lg backdrop-blur transition-colors hover:border-amber-600/70 hover:text-amber-400"
+          className="flex items-center gap-1.5 rounded border border-amber-700/50 bg-[#08100c]/90 px-3 py-1.5 font-mono text-[11px] font-medium tracking-wider text-amber-500/80 shadow-lg backdrop-blur transition-colors hover:border-amber-600/70 hover:text-amber-400"
         >
           {chatOpen ? (
             <>

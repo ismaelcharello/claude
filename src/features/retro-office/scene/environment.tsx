@@ -60,52 +60,26 @@ function FramedPicture({
   );
 }
 
-function UsaFlagArt() {
+/** Savana banner: deep green field, champagne horizon arc, ivory strata. */
+function SavanaBannerArt() {
   const flagWidth = 0.52;
   const flagHeight = 0.3;
-  const stripeHeight = flagHeight / 13;
-  const cantonWidth = flagWidth * 0.4;
-  const cantonHeight = stripeHeight * 7;
-
   return (
     <>
-      {Array.from({ length: 13 }).map((_, index) => (
-        <mesh
-          key={`usa-stripe-${index}`}
-          position={[0, flagHeight / 2 - stripeHeight / 2 - index * stripeHeight, 0]}
-        >
-          <planeGeometry args={[flagWidth, stripeHeight]} />
-          <meshBasicMaterial
-            color={index % 2 === 0 ? "#b22234" : "#ffffff"}
-            side={2}
-          />
+      <mesh>
+        <planeGeometry args={[flagWidth, flagHeight]} />
+        <meshBasicMaterial color="#10281d" side={2} />
+      </mesh>
+      <mesh position={[0, -0.005, 0.001]}>
+        <ringGeometry args={[0.062, 0.074, 32, 1, 0, Math.PI]} />
+        <meshBasicMaterial color="#c8a66a" side={2} />
+      </mesh>
+      {[0.2, 0.14, 0.08].map((width, index) => (
+        <mesh key={`savana-line-${index}`} position={[0, -0.022 - index * 0.026, 0.001]}>
+          <planeGeometry args={[width, 0.008]} />
+          <meshBasicMaterial color="#f4f0e7" side={2} transparent opacity={0.9 - index * 0.25} />
         </mesh>
       ))}
-      <mesh
-        position={[
-          -flagWidth / 2 + cantonWidth / 2,
-          flagHeight / 2 - cantonHeight / 2,
-          0.001,
-        ]}
-      >
-        <planeGeometry args={[cantonWidth, cantonHeight]} />
-        <meshBasicMaterial color="#3c3b6e" side={2} />
-      </mesh>
-      {Array.from({ length: 5 }).map((_, row) =>
-        Array.from({ length: 6 }).map((__, column) => (
-          <mesh
-            key={`usa-star-${row}-${column}`}
-            position={[
-              -flagWidth / 2 + 0.04 + column * 0.025,
-              flagHeight / 2 - 0.03 - row * 0.035,
-              0.002,
-            ]}
-          >
-            <circleGeometry args={[0.0045, 6]} />
-            <meshBasicMaterial color="#ffffff" side={2} />
-          </mesh>
-        )),
-      )}
     </>
   );
 }
@@ -242,7 +216,7 @@ export const FloorAndWalls = memo(function FloorAndWalls({
         receiveShadow
       >
         <planeGeometry args={[localOfficeWidth, localOfficeHeight, 22, 14]} />
-        <meshLambertMaterial color="#c8a97e" />
+        <meshLambertMaterial color="#d6cdb9" />
       </mesh>
 
       {showRemoteOffice ? (
@@ -253,7 +227,7 @@ export const FloorAndWalls = memo(function FloorAndWalls({
             receiveShadow
           >
             <planeGeometry args={[localOfficeWidth, localOfficeHeight, 22, 14]} />
-            <meshLambertMaterial color="#c8a97e" />
+            <meshLambertMaterial color="#d6cdb9" />
           </mesh>
 
           <mesh
@@ -517,7 +491,7 @@ export const FloorAndWalls = memo(function FloorAndWalls({
               rotation={[-Math.PI / 2, 0, 0]}
             >
               <planeGeometry args={[localOfficeWidth, 0.008]} />
-              <meshBasicMaterial color="#a07850" transparent opacity={0.25} />
+              <meshBasicMaterial color="#c8a66a" transparent opacity={0.3} />
             </mesh>
             {showRemoteOffice ? (
               <mesh
@@ -525,7 +499,7 @@ export const FloorAndWalls = memo(function FloorAndWalls({
                 rotation={[-Math.PI / 2, 0, 0]}
               >
                 <planeGeometry args={[localOfficeWidth, 0.008]} />
-                <meshBasicMaterial color="#a07850" transparent opacity={0.25} />
+                <meshBasicMaterial color="#c8a66a" transparent opacity={0.3} />
               </mesh>
             ) : null}
           </group>
@@ -533,8 +507,8 @@ export const FloorAndWalls = memo(function FloorAndWalls({
       })}
 
       {(() => {
-        const wallColor = "#8d6e63";
-        const wallEmissive = "#4e342e";
+        const wallColor = "#1e4a35";
+        const wallEmissive = "#10281d";
 
         return (
           <>
@@ -714,7 +688,7 @@ export const WallPictures = memo(function WallPictures({
       <OfficeFlagPole
         position={localFlagPolePosition}
         rotY={0.32}
-        art={<UsaFlagArt />}
+        art={<SavanaBannerArt />}
       />
       {showRemoteOffice ? (
         <OfficeFlagPole

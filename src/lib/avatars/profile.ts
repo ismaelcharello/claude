@@ -1,3 +1,4 @@
+import { SAVANA_AVATAR_PRESETS } from "@/lib/savana/avatars";
 export type AgentAvatarHairStyle = "short" | "parted" | "spiky" | "bun";
 export type AgentAvatarTopStyle = "tee" | "hoodie" | "jacket";
 export type AgentAvatarBottomStyle = "pants" | "shorts" | "cuffed";
@@ -141,6 +142,10 @@ const resolveEnumOption = <T extends string>(
 
 export const createAgentAvatarProfileFromSeed = (seed: string): AgentAvatarProfile => {
   const normalizedSeed = seed.trim() || "agent";
+  const savanaPreset = SAVANA_AVATAR_PRESETS[normalizedSeed];
+  if (savanaPreset) {
+    return { version: AGENT_AVATAR_VERSION, seed: normalizedSeed, ...structuredClone(savanaPreset) };
+  }
   const hash = hashSeed(normalizedSeed);
   const skinTone = pick(AGENT_AVATAR_SKIN_TONE_OPTIONS, hash).color;
   const hairStyle = pick(AGENT_AVATAR_HAIR_STYLE_OPTIONS, hash >>> 3).id;

@@ -125,6 +125,9 @@ export class DemoRuntime implements AgentRuntime {
 
   private finish(task: Task) {
     if (!this.stillIn(task.id, "trabalhando")) return;
+    for (const subtask of this.service.getTaskDetail(task.id).subtasks) {
+      if (!subtask.done && subtask.title.endsWith("(simulado)")) this.service.setSubtaskDone(subtask.id, true, DEMO);
+    }
     this.service.transitionTask(task.id, "em_revisao", DEMO, { note: `${TAG} resultado simulado pronto` });
     this.service.addArtifact(
       {

@@ -27,6 +27,7 @@ import {
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { OfflineEnvironment } from "./scene/OfflineEnvironment";
+import { formatOfficeConnectionLabel, SAVANA_OFFICE_ENABLED } from "@/lib/savana/office";
 import * as THREE from "three";
 import { SettingsPanel } from "@/features/office/components/panels/SettingsPanel";
 import { AtmImmersiveScreen } from "@/features/office/screens/AtmImmersiveScreen";
@@ -2267,7 +2268,7 @@ export function RetroOffice3D({
   githubSkill = null,
   taskManagerEnabled = false,
   soundclawEnabled = false,
-  officeTitle = "Luke Headquarters",
+  officeTitle = "Savana Command Center",
   officeTitleLoaded = false,
   remoteOfficeEnabled = false,
   remoteOfficeSourceKind = "presence_endpoint",
@@ -5177,7 +5178,7 @@ export function RetroOffice3D({
   }, [officeCenterSignal, overviewPreset]);
 
   return (
-    <div className="relative w-full h-full bg-[#1a1008] font-mono text-white overflow-hidden">
+    <div className="relative w-full h-full bg-[#0e1813] font-mono text-white overflow-hidden">
       {/* 3D Canvas — fills everything. */}
       <div
         className="absolute inset-0"
@@ -5878,7 +5879,7 @@ export function RetroOffice3D({
                 onClick={() => {
                   cameraPresetRef.current = CAMERA_PRESET_MAP[key];
                 }}
-                className="w-7 h-7 flex items-center justify-center rounded-md bg-[#1c1610]/80 text-amber-500/60 border border-amber-900/20 hover:bg-[#2a1e14] hover:text-amber-400 backdrop-blur-sm transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-md bg-[#122019]/80 text-amber-500/60 border border-amber-900/20 hover:bg-[#1d3026] hover:text-amber-400 backdrop-blur-sm transition-colors"
               >
                 {icon}
               </button>
@@ -5936,7 +5937,7 @@ export function RetroOffice3D({
       {/* Agent roster — compact top summary with overflow panel. */}
       {!readOnly && !immersiveOverlayActive ? (
         <div className="absolute top-10 left-1/2 z-20 -translate-x-1/2">
-          <div className="flex items-center gap-2 rounded-full border border-amber-900/25 bg-[#1c1610]/92 px-2 py-2 shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2 rounded-full border border-amber-900/25 bg-[#122019]/92 px-2 py-2 shadow-lg backdrop-blur-sm">
             <div className="flex items-center -space-x-1.5">
               {compactRosterAgents.map((agent) => {
                 const status = agentStatusLookup[agent.id];
@@ -5958,14 +5959,19 @@ export function RetroOffice3D({
                     onMouseLeave={handleAgentUnhover}
                     onClick={() => {
                       setSpotlightAgentId(agent.id);
-                      if (!isRemoteAgent) {
+                      if (isRemoteAgent) return;
+                      // Savana agents are defined by the Savana backend, so the
+                      // roster opens their details instead of the avatar editor.
+                      if (SAVANA_OFFICE_ENABLED) {
+                        onAgentChatSelect?.(agent.id);
+                      } else {
                         onAgentEdit?.(agent.id);
                       }
                     }}
-                    className={`relative flex h-8 w-8 items-center justify-center rounded-full border text-[9px] font-bold text-[#120e08] shadow transition-transform hover:-translate-y-0.5 ${
+                    className={`relative flex h-8 w-8 items-center justify-center rounded-full border text-[9px] font-bold text-[#0c140f] shadow transition-transform hover:-translate-y-0.5 ${
                       spotlightAgentId === agent.id
                         ? "border-amber-200/80 ring-2 ring-amber-200/20"
-                        : "border-[#120e08] hover:border-amber-200/50"
+                        : "border-[#0c140f] hover:border-amber-200/50"
                     }`}
                     style={{ backgroundColor: agent.color }}
                   >
@@ -5983,7 +5989,7 @@ export function RetroOffice3D({
                     ) : null}
                     <span>{getAgentInitials(agent.name)}</span>
                     <span
-                      className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-[#1c1610] ${dotClass}`}
+                      className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-[#122019] ${dotClass}`}
                     />
                   </button>
                 );
@@ -5992,7 +5998,7 @@ export function RetroOffice3D({
                 <button
                   type="button"
                   onClick={() => setAgentRosterOpen(true)}
-                  className="flex h-8 min-w-8 items-center justify-center rounded-full border border-amber-900/30 bg-[#120e08] px-2 text-[10px] font-semibold text-amber-200 transition-colors hover:border-amber-500/40 hover:text-white"
+                  className="flex h-8 min-w-8 items-center justify-center rounded-full border border-amber-900/30 bg-[#0c140f] px-2 text-[10px] font-semibold text-amber-200 transition-colors hover:border-amber-500/40 hover:text-white"
                 >
                   +{hiddenAgentCount}
                 </button>
@@ -6011,7 +6017,7 @@ export function RetroOffice3D({
           </div>
 
           {agentRosterVisible ? (
-            <div className="absolute left-1/2 top-full mt-2 w-[min(92vw,560px)] -translate-x-1/2 rounded-2xl border border-amber-900/25 bg-[#120e08]/96 p-3 shadow-2xl backdrop-blur-sm">
+            <div className="absolute left-1/2 top-full mt-2 w-[min(92vw,560px)] -translate-x-1/2 rounded-2xl border border-amber-900/25 bg-[#0c140f]/96 p-3 shadow-2xl backdrop-blur-sm">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-500/70">
@@ -6060,12 +6066,12 @@ export function RetroOffice3D({
                         className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       >
                         <div
-                          className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-[#120e08]"
+                          className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-[#0c140f]"
                           style={{ backgroundColor: agent.color }}
                         >
                           {getAgentInitials(agent.name)}
                           <span
-                            className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-[#120e08] ${dotClass}`}
+                            className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-[#0c140f] ${dotClass}`}
                           />
                         </div>
                         <div className="min-w-0">
@@ -6158,14 +6164,14 @@ export function RetroOffice3D({
             hoveredAgentStatus?.working ?? hoveredAgent.status === "working";
           return (
             <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none select-none">
-              <div className="flex items-center gap-3 bg-[#120e08]/95 backdrop-blur-sm border border-amber-800/30 rounded-lg px-4 py-2.5 shadow-xl">
+              <div className="flex items-center gap-3 bg-[#0c140f]/95 backdrop-blur-sm border border-amber-800/30 rounded-lg px-4 py-2.5 shadow-xl">
                 <div className="relative shrink-0">
                   <div
                     className="w-6 h-6 rounded-sm"
                     style={{ backgroundColor: hoveredAgent.color }}
                   />
                   <div
-                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#120e08] ${
+                    className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0c140f] ${
                       isError
                         ? "bg-red-400"
                         : working
@@ -6222,7 +6228,7 @@ export function RetroOffice3D({
           if (!imageUrl) return null;
           return (
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-none select-none">
-              <div className="flex flex-col items-center gap-2 bg-[#120e08]/95 backdrop-blur-sm border border-amber-800/30 rounded-lg p-3 shadow-xl max-w-xs">
+              <div className="flex flex-col items-center gap-2 bg-[#0c140f]/95 backdrop-blur-sm border border-amber-800/30 rounded-lg p-3 shadow-xl max-w-xs">
                 {agent ? (
                   <div className="flex items-center gap-2 self-start">
                     <div
@@ -6253,7 +6259,7 @@ export function RetroOffice3D({
           const agent = agents.find((a) => a.id === contextMenu.id);
           return (
             <div
-              className="absolute z-50 bg-[#120e08] border border-amber-800/30 rounded-lg shadow-xl overflow-hidden"
+              className="absolute z-50 bg-[#0c140f] border border-amber-800/30 rounded-lg shadow-xl overflow-hidden"
               style={{ left: contextMenu.x, top: contextMenu.y }}
               onPointerDown={(e) => e.stopPropagation()}
             >
@@ -6278,7 +6284,7 @@ export function RetroOffice3D({
       {!immersiveOverlayActive && !editMode && selectedDeskActionItem ? (
         <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center">
           <div
-            className="pointer-events-auto w-[320px] rounded-xl border border-amber-800/25 bg-[#120e08]/95 p-3 shadow-2xl backdrop-blur-sm"
+            className="pointer-events-auto w-[320px] rounded-xl border border-amber-800/25 bg-[#0c140f]/95 p-3 shadow-2xl backdrop-blur-sm"
             onPointerDown={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -6338,7 +6344,7 @@ export function RetroOffice3D({
                       nextAgentId || null,
                     );
                   }}
-                  className="w-full rounded-md border border-amber-800/25 bg-[#1c1610] px-2 py-2 text-[11px] text-amber-100 outline-none transition-colors focus:border-amber-500/50"
+                  className="w-full rounded-md border border-amber-800/25 bg-[#122019] px-2 py-2 text-[11px] text-amber-100 outline-none transition-colors focus:border-amber-500/50"
                 >
                   <option value="">Unassigned desk.</option>
                   {agents.map((agent) => (
@@ -6359,7 +6365,7 @@ export function RetroOffice3D({
         (() => {
           const followed = agents.find((a) => a.id === followAgentId);
           return (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#120e08]/90 backdrop-blur-sm border border-amber-700/40 rounded-full px-3 py-1 z-20 pointer-events-none select-none">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#0c140f]/90 backdrop-blur-sm border border-amber-700/40 rounded-full px-3 py-1 z-20 pointer-events-none select-none">
               <Camera size={10} className="text-amber-400" />
               <span className="text-[10px] font-bold text-amber-300 tracking-widest uppercase">
                 {followed?.name ?? "Agent"}
@@ -6811,13 +6817,13 @@ export function RetroOffice3D({
 
       {/* Edit mode badge. */}
       {!immersiveOverlayActive && editMode && (
-        <div className="absolute top-3 left-3 px-3 py-1 rounded-md bg-amber-500/90 text-[#1a1008] text-xs font-bold uppercase tracking-widest pointer-events-none z-10">
+        <div className="absolute top-3 left-3 px-3 py-1 rounded-md bg-amber-500/90 text-[#0e1813] text-xs font-bold uppercase tracking-widest pointer-events-none z-10">
           Edit Mode
         </div>
       )}
 
       {!immersiveOverlayActive && editMode && selectedItem && (
-        <div className="absolute top-12 right-16 w-64 rounded-lg border border-amber-800/30 bg-[#120e08]/95 p-3 shadow-xl backdrop-blur-sm z-20">
+        <div className="absolute top-12 right-16 w-64 rounded-lg border border-amber-800/30 bg-[#0c140f]/95 p-3 shadow-xl backdrop-blur-sm z-20">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-500/65">
@@ -6836,7 +6842,7 @@ export function RetroOffice3D({
             <button
               onClick={closeSelectedEditor}
               title="Close object editor"
-              className="flex h-7 w-7 items-center justify-center rounded-md border border-amber-800/25 bg-[#1c1610] text-amber-300/80 transition-colors hover:bg-[#261e16] hover:text-amber-200"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-amber-800/25 bg-[#122019] text-amber-300/80 transition-colors hover:bg-[#1a2a21] hover:text-amber-200"
             >
               <X size={12} />
             </button>
@@ -6849,33 +6855,33 @@ export function RetroOffice3D({
               <div />
               <button
                 onClick={() => moveSelectedItem(0, -SNAP_GRID)}
-                className="rounded-md border border-amber-800/25 bg-[#1c1610] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#261e16]"
+                className="rounded-md border border-amber-800/25 bg-[#122019] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#1a2a21]"
               >
                 Forward
               </button>
               <div />
               <button
                 onClick={() => moveSelectedItem(-SNAP_GRID, 0)}
-                className="rounded-md border border-amber-800/25 bg-[#1c1610] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#261e16]"
+                className="rounded-md border border-amber-800/25 bg-[#122019] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#1a2a21]"
               >
                 Left
               </button>
               <button
                 onClick={() => moveSelectedItem(0, 0, ELEVATION_STEP)}
-                className="rounded-md border border-amber-800/25 bg-[#1c1610] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#261e16]"
+                className="rounded-md border border-amber-800/25 bg-[#122019] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#1a2a21]"
               >
                 Up
               </button>
               <button
                 onClick={() => moveSelectedItem(SNAP_GRID, 0)}
-                className="rounded-md border border-amber-800/25 bg-[#1c1610] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#261e16]"
+                className="rounded-md border border-amber-800/25 bg-[#122019] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#1a2a21]"
               >
                 Right
               </button>
               <div />
               <button
                 onClick={() => moveSelectedItem(0, SNAP_GRID)}
-                className="rounded-md border border-amber-800/25 bg-[#1c1610] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#261e16]"
+                className="rounded-md border border-amber-800/25 bg-[#122019] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#1a2a21]"
               >
                 Back
               </button>
@@ -6883,7 +6889,7 @@ export function RetroOffice3D({
               <div />
               <button
                 onClick={() => moveSelectedItem(0, 0, -ELEVATION_STEP)}
-                className="rounded-md border border-amber-800/25 bg-[#1c1610] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#261e16]"
+                className="rounded-md border border-amber-800/25 bg-[#122019] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#1a2a21]"
               >
                 Down
               </button>
@@ -6897,13 +6903,13 @@ export function RetroOffice3D({
             <div className="grid grid-cols-2 gap-1.5">
               <button
                 onClick={() => rotateSelectedItem(-ROTATION_STEP_DEG)}
-                className="rounded-md border border-amber-800/25 bg-[#1c1610] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#261e16]"
+                className="rounded-md border border-amber-800/25 bg-[#122019] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#1a2a21]"
               >
                 -15 deg
               </button>
               <button
                 onClick={() => rotateSelectedItem(ROTATION_STEP_DEG)}
-                className="rounded-md border border-amber-800/25 bg-[#1c1610] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#261e16]"
+                className="rounded-md border border-amber-800/25 bg-[#122019] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200/85 hover:bg-[#1a2a21]"
               >
                 +15 deg
               </button>
@@ -6927,7 +6933,7 @@ export function RetroOffice3D({
                     nextAgentId || null,
                   );
                 }}
-                className="w-full rounded-md border border-amber-800/25 bg-[#1c1610] px-2 py-2 text-[11px] text-amber-100 outline-none transition-colors focus:border-amber-500/50"
+                className="w-full rounded-md border border-amber-800/25 bg-[#122019] px-2 py-2 text-[11px] text-amber-100 outline-none transition-colors focus:border-amber-500/50"
               >
                 <option value="">Unassigned desk.</option>
                 {agents.map((agent) => (
@@ -6946,7 +6952,7 @@ export function RetroOffice3D({
 
       {/* Object Drawer — bottom right above toolbar when open. */}
       {!immersiveOverlayActive && editMode && drawerOpen && !selectedItem && (
-        <div className="absolute bottom-14 right-3 w-52 max-h-[calc(100vh-100px)] overflow-y-auto rounded-lg bg-[#1c1610]/95 border border-amber-800/20 p-3 shadow-xl backdrop-blur-sm z-20">
+        <div className="absolute bottom-14 right-3 w-52 max-h-[calc(100vh-100px)] overflow-y-auto rounded-lg bg-[#122019]/95 border border-amber-800/20 p-3 shadow-xl backdrop-blur-sm z-20">
           <div className="text-[10px] text-amber-500/70 font-bold uppercase tracking-widest mb-3">
             Objects
           </div>
@@ -6960,7 +6966,7 @@ export function RetroOffice3D({
                   (drag as { kind: "placing"; itemType: string }).itemType ===
                     entry.type
                     ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
-                    : "bg-[#120e08] border-amber-900/15 text-amber-200/70 hover:bg-[#261e16] hover:border-amber-800/30"
+                    : "bg-[#0c140f] border-amber-900/15 text-amber-200/70 hover:bg-[#1a2a21] hover:border-amber-800/30"
                 }`}
               >
                 <span className="text-lg leading-none">{entry.icon}</span>
@@ -6983,7 +6989,7 @@ export function RetroOffice3D({
             <button
               onClick={() => setSettingsModalOpen(true)}
               title={remoteOfficeStatusText}
-              className="flex h-7 items-center justify-center gap-1 rounded-md border border-white/15 bg-[#120e08]/92 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/75 transition-all backdrop-blur-sm hover:border-cyan-400/45 hover:text-cyan-100"
+              className="flex h-7 items-center justify-center gap-1 rounded-md border border-white/15 bg-[#0c140f]/92 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/75 transition-all backdrop-blur-sm hover:border-cyan-400/45 hover:text-cyan-100"
             >
               <span>{remoteOfficeLabel}</span>
             </button>
@@ -7008,20 +7014,24 @@ export function RetroOffice3D({
             }`}
             title={`Runtime: ${activeAdapterType} (${gatewayStatus})`}
           >
-            {activeAdapterType} • {gatewayStatus}
+            {formatOfficeConnectionLabel({
+              gatewayUrl,
+              adapterType: activeAdapterType,
+              status: gatewayStatus,
+            })}
           </div>
           {/* New Idea 7: Heatmap toggle. */}
           <button
             onClick={() => setHeatmapMode((p) => !p)}
             title="Toggle heatmap"
-            className={`w-7 h-7 flex items-center justify-center rounded-md transition-all backdrop-blur-sm border ${heatmapMode ? "bg-amber-500/30 text-amber-300 border-amber-500/50" : "bg-[#1c1610]/80 text-amber-500/40 border-amber-900/20 hover:text-amber-400"}`}
+            className={`w-7 h-7 flex items-center justify-center rounded-md transition-all backdrop-blur-sm border ${heatmapMode ? "bg-amber-500/30 text-amber-300 border-amber-500/50" : "bg-[#122019]/80 text-amber-500/40 border-amber-900/20 hover:text-amber-400"}`}
           >
             <MapIcon size={12} />
           </button>
           <button
             onClick={() => setTrailMode((p) => !p)}
             title="Toggle trails"
-            className={`w-7 h-7 flex items-center justify-center rounded-md transition-all backdrop-blur-sm border ${trailMode ? "bg-amber-500/30 text-amber-300 border-amber-500/50" : "bg-[#1c1610]/80 text-amber-500/40 border-amber-900/20 hover:text-amber-400"}`}
+            className={`w-7 h-7 flex items-center justify-center rounded-md transition-all backdrop-blur-sm border ${trailMode ? "bg-amber-500/30 text-amber-300 border-amber-500/50" : "bg-[#122019]/80 text-amber-500/40 border-amber-900/20 hover:text-amber-400"}`}
           >
             <Maximize size={12} />
           </button>
@@ -7029,7 +7039,7 @@ export function RetroOffice3D({
           <button
             onClick={toggleEdit}
             title={editMode ? "Done editing" : "Edit office"}
-            className={`w-7 h-7 flex items-center justify-center rounded-md transition-all backdrop-blur-sm border ${editMode ? "bg-amber-500/30 text-amber-300 border-amber-500/50" : "bg-[#1c1610]/80 text-amber-500/40 border-amber-900/20 hover:text-amber-400"}`}
+            className={`w-7 h-7 flex items-center justify-center rounded-md transition-all backdrop-blur-sm border ${editMode ? "bg-amber-500/30 text-amber-300 border-amber-500/50" : "bg-[#122019]/80 text-amber-500/40 border-amber-900/20 hover:text-amber-400"}`}
           >
             {editMode ? (
               <Check size={12} strokeWidth={2.5} />
@@ -7040,7 +7050,7 @@ export function RetroOffice3D({
           <button
             onClick={() => setSettingsModalOpen(true)}
             title="Voice reply settings"
-            className={`w-7 h-7 flex items-center justify-center rounded-md transition-all backdrop-blur-sm border ${settingsModalOpen ? "bg-amber-500/30 text-amber-300 border-amber-500/50" : "bg-[#1c1610]/80 text-amber-500/40 border-amber-900/20 hover:text-amber-400"}`}
+            className={`w-7 h-7 flex items-center justify-center rounded-md transition-all backdrop-blur-sm border ${settingsModalOpen ? "bg-amber-500/30 text-amber-300 border-amber-500/50" : "bg-[#122019]/80 text-amber-500/40 border-amber-900/20 hover:text-amber-400"}`}
           >
             <Settings2 size={12} />
           </button>
@@ -7057,7 +7067,7 @@ export function RetroOffice3D({
               )}
               <button
                 onClick={handleReset}
-                className="px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#2a1e14]/90 text-amber-400/60 border border-amber-800/20 hover:bg-[#3a2a1a] backdrop-blur-sm"
+                className="px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#1d3026]/90 text-amber-400/60 border border-amber-800/20 hover:bg-[#3a2a1a] backdrop-blur-sm"
               >
                 Reset
               </button>
@@ -7071,7 +7081,7 @@ export function RetroOffice3D({
               )}
               <button
                 onClick={() => setDrawerOpen((p) => !p)}
-                className="px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#2a1e14]/90 text-amber-400 border border-amber-800/30 hover:bg-[#3a2a1a] backdrop-blur-sm"
+                className="px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#1d3026]/90 text-amber-400 border border-amber-800/30 hover:bg-[#3a2a1a] backdrop-blur-sm"
               >
                 {drawerOpen ? "Hide Objects" : "Show Objects"}
               </button>

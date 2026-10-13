@@ -48,6 +48,8 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): SavanaConfig =
     repoRoot: env.SAVANA_REPO_ROOT?.trim() ? path.resolve(env.SAVANA_REPO_ROOT.trim()) : null,
     worktreeRoot: env.SAVANA_WORKTREE_ROOT?.trim() ? path.resolve(env.SAVANA_WORKTREE_ROOT.trim()) : null,
     claudeCodeEnabled: env.SAVANA_CLAUDE_CODE_ENABLED === "true",
-    allowedOrigins: [`http://localhost:${studioPort}`, `http://127.0.0.1:${studioPort}`],
+    // Studio (browser) origin, plus the backend's own origin, which the Studio
+    // gateway proxy sends when it connects server-side to /gateway.
+    allowedOrigins: [studioPort, port].flatMap((p) => [`http://localhost:${p}`, `http://127.0.0.1:${p}`]),
   };
 };

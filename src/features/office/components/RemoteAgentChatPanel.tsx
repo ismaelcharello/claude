@@ -106,7 +106,7 @@ export const RemoteAgentChatPanel = memo(function RemoteAgentChatPanel({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#0e0a04]">
+    <div className="flex min-h-0 flex-1 flex-col bg-[#08100c]">
       <div className="border-b border-white/10 px-4 py-3">
         <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300/70">
           Remote Agent

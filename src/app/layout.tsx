@@ -3,8 +3,8 @@ import { Bebas_Neue, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Claw3D",
-  description: "Focused operator studio for the OpenClaw gateway.",
+  title: "Savana Command Center",
+  description: "Escritório virtual 3D para coordenar os agentes de IA da Savana. Construído sobre o Claw3D.",
 };
 
 const display = Bebas_Neue({
@@ -31,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

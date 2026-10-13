@@ -5,6 +5,40 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Savana Command Center palette */
+@theme {
+  --color-savana-deep: #10281d;
+  --color-savana-mid: #1e4a35;
+  --color-savana-gold: #c8a66a;
+  --color-savana-ivory: #f4f0e7;
+  --color-savana-graphite: #131714;
+
+  /* The Claw3D office HUD is built on Tailwind's amber and cyan scales.
+     Remap them to Savana's champagne gold and greens so the whole office
+     follows the brand without rewriting every component. */
+  --color-amber-50: #faf6ee;
+  --color-amber-100: #f4ecda;
+  --color-amber-200: #e9d8b5;
+  --color-amber-300: #dcc392;
+  --color-amber-400: #d1b47c;
+  --color-amber-500: #c8a66a;
+  --color-amber-600: #b08c50;
+  --color-amber-700: #8d6f3e;
+  --color-amber-800: #6b5430;
+  --color-amber-900: #4a3a22;
+  --color-amber-950: #2d2314;
+  --color-cyan-100: #dcefe4;
+  --color-cyan-200: #b9dcc8;
+  --color-cyan-300: #8fc4a6;
+  --color-cyan-400: #6aaa88;
+  --color-cyan-500: #4f8a6a;
+  --color-cyan-600: #3d6f54;
+  --color-cyan-700: #2f5842;
+  --color-cyan-800: #234433;
+  --color-cyan-900: #1a3226;
+  --color-cyan-950: #10281d;
+}
+
 :root {
   --neutral-tint-rgb: rgb(90 132 154);
   --neutral-tint: #5a849a;

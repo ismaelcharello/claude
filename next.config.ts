@@ -56,7 +56,19 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
+const savanaApiPort = Number.parseInt(process.env.SAVANA_API_PORT ?? "3100", 10) || 3100;
+
 const nextConfig: NextConfig = {
+  // Savana backend (savana/server) is a separate local process; the browser
+  // only ever talks to this same origin.
+  async rewrites() {
+    return [
+      {
+        source: "/api/savana/:path*",
+        destination: `http://127.0.0.1:${savanaApiPort}/api/:path*`,
+      },
+    ];
+  },
   turbopack: {
     root: path.resolve(__dirname),
   },
