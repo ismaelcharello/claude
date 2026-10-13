@@ -13,6 +13,7 @@ import { MessageSquare, ChevronDown, ChevronLeft, ChevronRight, Mic } from "luci
 import { RetroOffice3D } from "@/features/retro-office/RetroOffice3D";
 import type { OfficeAgent } from "@/features/retro-office/core/types";
 import { RunningAvatarLoader } from "@/features/agents/components/RunningAvatarLoader";
+import { useStructuralSharing } from "@/hooks/useStructuralSharing";
 import { GatewayConnectScreen } from "@/features/agents/components/GatewayConnectScreen";
 import { useAgentStore, type AgentState } from "@/features/agents/state/store";
 import {
@@ -3182,7 +3183,7 @@ export function OfficeScreen({
     agents: state.agents,
   });
   const animationNowMs = Date.now();
-  const officeAnimationState = useMemo(() => {
+  const rawOfficeAnimationState = useMemo(() => {
     const base = buildOfficeAnimationState({
       state: officeTriggerState,
       agents: state.agents,
@@ -3229,6 +3230,9 @@ export function OfficeScreen({
     skillTriggers.movementTargetByAgentId,
     state.agents,
   ]);
+  // Rebuilt every render (depends on Date.now()); keep field identities stable
+  // so downstream effects do not loop on structurally identical maps.
+  const officeAnimationState = useStructuralSharing(rawOfficeAnimationState);
   const {
     deskHoldByAgentId,
     githubHoldByAgentId,
@@ -3243,12 +3247,27 @@ export function OfficeScreen({
     textMessageByAgentId,
     workingUntilByAgentId,
   } = officeAnimationState;
-  const immediateGymHoldByAgentId = useMemo(
-    () => ({
-      ...marketplaceGymHoldByAgentId,
-      ...skillGymHoldByAgentId,
-    }),
-    [marketplaceGymHoldByAgentId, skillGymHoldByAgentId],
+  // officeAnimationState is recomputed on every render (it depends on
+  // Date.now()), so the merged hold map would be a new object each time.
+  // Key it on its content instead; otherwise the gym-cooldown effect below
+  // re-runs and re-schedules state on every render, which loops until React
+  // aborts with "Maximum update depth exceeded".
+  const immediateGymHoldKey = Object.entries({
+    ...marketplaceGymHoldByAgentId,
+    ...skillGymHoldByAgentId,
+  })
+    .filter(([, held]) => held)
+    .map(([agentId]) => agentId)
+    .sort()
+    .join("|");
+  const immediateGymHoldByAgentId = useMemo<Record<string, boolean>>(
+    () =>
+      Object.fromEntries(
+        immediateGymHoldKey
+          ? immediateGymHoldKey.split("|").map((agentId) => [agentId, true])
+          : [],
+      ),
+    [immediateGymHoldKey],
   );
 
   useEffect(() => {

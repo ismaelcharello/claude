@@ -44,3 +44,7 @@ export const PING_PONG_SESSION_MS = 60_000;
 export const PING_PONG_APPROACH_SPEED = WALK_SPEED * 1.8;
 export const PING_PONG_BALL_RADIUS = 0.055;
 export const PING_PONG_TABLE_SURFACE_Y = 0.465;
+
+// Local font for in-scene <Text>. Without an explicit font, troika-three-text
+// downloads glyph data from a public CDN, which hangs the scene offline.
+export const OFFICE_TEXT_FONT = "/fonts/Carlito-Bold.ttf";

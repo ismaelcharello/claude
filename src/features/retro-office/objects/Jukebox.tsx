@@ -11,6 +11,7 @@ import {
   toWorld,
 } from "@/features/retro-office/core/geometry";
 import type { InteractiveFurnitureModelProps } from "@/features/retro-office/objects/types";
+import { OFFICE_TEXT_FONT } from "@/features/retro-office/core/constants";
 
 export type JukeboxModelProps = InteractiveFurnitureModelProps & {
   active?: boolean;
@@ -117,7 +118,7 @@ export function JukeboxModel({
 
         {/* Track status / disabled text on display. */}
         <Billboard position={[0, 1.1, 0.32]} follow={false}>
-          <Text
+          <Text font={OFFICE_TEXT_FONT}
             fontSize={0.07}
             color={enabled ? C.displayText : "#666"}
             anchorX="center"
@@ -190,7 +191,7 @@ export function JukeboxModel({
         {/* Floating "Install skill" hint above the machine when disabled and hovered. */}
         {!enabled && (localHovered || isHovered) && (
           <Billboard position={[0, 2.0, 0]} follow={false}>
-            <Text fontSize={0.07} color="#facc15" anchorX="center" anchorY="middle" outlineWidth={0.01} outlineColor="#000">
+            <Text font={OFFICE_TEXT_FONT} fontSize={0.07} color="#facc15" anchorX="center" anchorY="middle" outlineWidth={0.01} outlineColor="#000">
               Click to install SOUNDCLAW
             </Text>
           </Billboard>

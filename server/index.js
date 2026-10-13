@@ -104,11 +104,17 @@ async function main() {
 
   await app.prepare();
   const handleUpgrade = app.getUpgradeHandler();
+  // Next.js (dev) attaches its own "upgrade" listener to the HTTP server on the
+  // first request and serves HMR through it; app.getUpgradeHandler() alone does
+  // not complete the HMR handshake in Next 16. We keep Next's listener but wrap
+  // it so it never touches the gateway proxy path (see attachUpgradeHandlers).
+  const serversWithNextUpgrade = new WeakSet();
   const handleServerUpgrade = (req, socket, head) => {
     if (resolvePathname(req.url) === "/api/gateway/ws") {
       proxy.handleUpgrade(req, socket, head);
       return;
     }
+    if (socket.server && serversWithNextUpgrade.has(socket.server)) return;
     handleUpgrade(req, socket, head);
   };
 
@@ -131,9 +137,16 @@ async function main() {
     server.on("upgrade", handleServerUpgrade);
     server.on("newListener", (eventName, listener) => {
       if (eventName !== "upgrade") return;
-      if (listener === handleServerUpgrade) return;
+      if (listener === handleServerUpgrade || listener.__claw3dWrapped) return;
       process.nextTick(() => {
         server.removeListener("upgrade", listener);
+        const wrapped = (req, socket, head) => {
+          if (resolvePathname(req.url) === "/api/gateway/ws") return;
+          listener.call(server, req, socket, head);
+        };
+        wrapped.__claw3dWrapped = true;
+        serversWithNextUpgrade.add(server);
+        server.on("upgrade", wrapped);
       });
     });
   };
@@ -161,11 +174,25 @@ async function main() {
       server.close(() => resolve());
     });
 
-  try {
-    await Promise.all(servers.map((server, index) => listenOnHost(server, hostnames[index])));
-  } catch (err) {
+  // Some hosts (containers, IPv6-disabled kernels) cannot bind ::1. When at
+  // least one loopback listener succeeds, skip the unsupported address family
+  // instead of aborting startup.
+  const UNSUPPORTED_FAMILY_CODES = new Set(["EAFNOSUPPORT", "EADDRNOTAVAIL"]);
+  const results = await Promise.allSettled(
+    servers.map((server, index) => listenOnHost(server, hostnames[index]))
+  );
+  const failures = results
+    .map((result, index) => ({ result, host: hostnames[index] }))
+    .filter(({ result }) => result.status === "rejected");
+  const fatal = failures.find(
+    ({ result }) => !UNSUPPORTED_FAMILY_CODES.has(result.reason?.code)
+  );
+  if (fatal || failures.length === results.length) {
     await Promise.all(servers.map((server) => closeServer(server)));
-    throw err;
+    throw (fatal ?? failures[0]).result.reason;
+  }
+  for (const { host, result } of failures) {
+    console.warn(`Skipping listener on ${host}: ${result.reason?.code ?? result.reason}`);
   }
 
   const hostForBrowser = hostnames.some((value) => value === "127.0.0.1" || value === "::1")

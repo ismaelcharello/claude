@@ -15,6 +15,7 @@ import type {
   OfficeAgent,
   RenderAgent,
 } from "@/features/retro-office/core/types";
+import { OFFICE_TEXT_FONT } from "@/features/retro-office/core/constants";
 
 const HEAT_COLS = Math.floor(CANVAS_W / SNAP_GRID);
 const HEAT_ROWS = Math.floor(CANVAS_H / SNAP_GRID);
@@ -254,7 +255,7 @@ export function DeskNameplates({
               <planeGeometry args={[0.035, 0.16]} />
               <meshBasicMaterial color={agent.color} />
             </mesh>
-            <Text
+            <Text font={OFFICE_TEXT_FONT}
               position={[0.01, 0.002, 0.001]}
               fontSize={0.11}
               color="#fff6d8"
@@ -263,7 +264,6 @@ export function DeskNameplates({
               maxWidth={0.64}
               outlineWidth={0.007}
               outlineColor="#16110a"
-              font={undefined}
               overflowWrap="break-word"
               whiteSpace="nowrap"
             >

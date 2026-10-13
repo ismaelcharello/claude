@@ -8,6 +8,7 @@ import {
   toWorld,
 } from "@/features/retro-office/core/geometry";
 import { InteractiveFurnitureModelProps } from "@/features/retro-office/objects/types";
+import { OFFICE_TEXT_FONT } from "@/features/retro-office/core/constants";
 
 export function AtmMachineModel({
   item,
@@ -73,7 +74,7 @@ export function AtmMachineModel({
             emissiveIntensity={0.8}
           />
         </mesh>
-        <Text
+        <Text font={OFFICE_TEXT_FONT}
           position={[0, 0.95, depthWorld * 0.3]}
           fontSize={0.06}
           color="#ffffff"
@@ -101,7 +102,7 @@ export function AtmMachineModel({
               roughness={0.2}
             />
           </mesh>
-          <Text
+          <Text font={OFFICE_TEXT_FONT}
             position={[0, 0.1, depthWorld * 0.25 + 0.05]}
             rotation={[-0.2, 0, 0]}
             fontSize={0.045}
@@ -111,7 +112,7 @@ export function AtmMachineModel({
           >
             WELCOME
           </Text>
-          <Text
+          <Text font={OFFICE_TEXT_FONT}
             position={[0, 0.06, depthWorld * 0.25 + 0.05]}
             rotation={[-0.2, 0, 0]}
             fontSize={0.02}
@@ -255,7 +256,7 @@ export function PhoneBoothModel({
           <boxGeometry args={[widthWorld * 0.9, 0.1, depthWorld * 0.9]} />
           <meshStandardMaterial color="#1e293b" roughness={0.4} />
         </mesh>
-        <Text
+        <Text font={OFFICE_TEXT_FONT}
           position={[0, 2.25, depthWorld * 0.451]}
           fontSize={0.06}
           color="#38bdf8"
@@ -431,7 +432,7 @@ export function SmsBoothModel({
           <boxGeometry args={[widthWorld * 0.88, 0.08, depthWorld * 0.88]} />
           <meshStandardMaterial color="#1e293b" roughness={0.4} />
         </mesh>
-        <Text
+        <Text font={OFFICE_TEXT_FONT}
           position={[0, 1.69, depthWorld * 0.445]}
           fontSize={0.055}
           color="#22d3ee"
@@ -712,7 +713,7 @@ export function ServerTerminalModel({
             emissiveIntensity={0.7}
           />
         </mesh>
-        <Text
+        <Text font={OFFICE_TEXT_FONT}
           position={[0, 0.47, depthWorld * 0.45]}
           rotation={[-0.18, 0, 0]}
           fontSize={0.05}
@@ -722,7 +723,7 @@ export function ServerTerminalModel({
         >
           GITHUB
         </Text>
-        <Text
+        <Text font={OFFICE_TEXT_FONT}
           position={[0, 0.4, depthWorld * 0.45]}
           rotation={[-0.18, 0, 0]}
           fontSize={0.018}
@@ -817,7 +818,7 @@ export function QaTerminalModel({
             </mesh>
           </group>
         ))}
-        <Text
+        <Text font={OFFICE_TEXT_FONT}
           position={[0, 0.73, 0]}
           fontSize={0.034}
           color="#faf5ff"
@@ -826,7 +827,7 @@ export function QaTerminalModel({
         >
           QA LAB
         </Text>
-        <Text
+        <Text font={OFFICE_TEXT_FONT}
           position={[0, 0.66, 0]}
           fontSize={0.014}
           color="#ddd6fe"
@@ -968,7 +969,7 @@ export function DeviceRackModel({
             <meshStandardMaterial color="#22d3ee" emissive="#22d3ee" emissiveIntensity={0.55} />
           </mesh>
         ))}
-        <Text
+        <Text font={OFFICE_TEXT_FONT}
           position={[0, 1.05, 0]}
           fontSize={0.04}
           color="#e0f2fe"
@@ -1070,7 +1071,7 @@ export function TestBenchModel({
           <boxGeometry args={[0.12, 0.018, 0.018]} />
           <meshStandardMaterial color="#e2e8f0" roughness={0.28} metalness={0.65} />
         </mesh>
-        <Text
+        <Text font={OFFICE_TEXT_FONT}
           position={[0, 0.64, 0]}
           fontSize={0.034}
           color="#ede9fe"
@@ -2096,7 +2097,7 @@ export function ArtRackModel({
               <boxGeometry args={[widthWorld * 0.86, 0.18, 0.02]} />
               <meshStandardMaterial color="#111827" />
             </mesh>
-            <Text
+            <Text font={OFFICE_TEXT_FONT}
               position={[0, 0, 0.015]}
               fontSize={0.04}
               color={shelf.tone}

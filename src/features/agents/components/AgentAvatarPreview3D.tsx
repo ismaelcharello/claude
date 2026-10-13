@@ -1,6 +1,7 @@
 "use client";
 
-import { Environment, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
+import { OfflineEnvironment } from "@/features/retro-office/scene/OfflineEnvironment";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -328,7 +329,7 @@ export const AgentAvatarPreview3D = ({
             setReadyProfileKey(profileKey);
           }}
         />
-        <Environment preset="city" />
+        <OfflineEnvironment />
         <OrbitControls enablePan={false} enableZoom={false} maxPolarAngle={1.8} minPolarAngle={1.1} />
       </Canvas>
     </div>

@@ -13,6 +13,7 @@ import type {
   RenderAgent,
 } from "@/features/retro-office/core/types";
 import { AgentModelProps } from "@/features/retro-office/objects/types";
+import { OFFICE_TEXT_FONT } from "@/features/retro-office/core/constants";
 
 const MAX_NAMEPLATE_TEXT_LENGTH = 10;
 const MAX_SPEECH_BUBBLE_TEXT_LENGTH = 180;
@@ -1113,26 +1114,24 @@ export const AgentModel = memo(function AgentModel({
             <circleGeometry args={[0.052, 14]} />
             <meshBasicMaterial ref={statusDotMatRef} color="#ef4444" />
           </mesh>
-          <Text
+          <Text font={OFFICE_TEXT_FONT}
             position={[-0.02, subtitleText ? 0.05 : 0, 0.001]}
             fontSize={nameplateFontSize}
             color="#e8dfc0"
             anchorX="center"
             anchorY="middle"
             maxWidth={0.68}
-            font={undefined}
           >
             {nameplateText}
           </Text>
           {subtitleText ? (
-            <Text
+            <Text font={OFFICE_TEXT_FONT}
               position={[-0.02, -0.085, 0.001]}
               fontSize={0.082}
               color="#8ab4ff"
               anchorX="center"
               anchorY="middle"
               maxWidth={0.68}
-              font={undefined}
             >
               {subtitleText}
             </Text>
@@ -1145,7 +1144,7 @@ export const AgentModel = memo(function AgentModel({
             <planeGeometry args={[0.32, 0.18]} />
             <meshBasicMaterial color="#0d1015" transparent opacity={0.85} />
           </mesh>
-          <Text
+          <Text font={OFFICE_TEXT_FONT}
             position={[0, 0, 0.001]}
             fontSize={0.11}
             color="#6080b0"
@@ -1202,7 +1201,7 @@ export const AgentModel = memo(function AgentModel({
               depthWrite={false}
             />
           </mesh>
-          <Text
+          <Text font={OFFICE_TEXT_FONT}
             position={
               activeSpeechBubble
                 ? [-speechBubbleWidth / 2 + speechBubblePaddingX / 2, 0, 0.001]
@@ -1223,7 +1222,7 @@ export const AgentModel = memo(function AgentModel({
             {speechBubbleDisplayText}
           </Text>
           {activeSpeechBubble && speechBubbleWasTruncated ? (
-            <Text
+            <Text font={OFFICE_TEXT_FONT}
               position={[0, -speechBubbleHeight * 0.34, 0.001]}
               fontSize={0.09}
               color="#8ab4ff"

@@ -25,7 +25,8 @@ import {
   useState,
 } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
+import { OfflineEnvironment } from "./scene/OfflineEnvironment";
 import * as THREE from "three";
 import { SettingsPanel } from "@/features/office/components/panels/SettingsPanel";
 import { AtmImmersiveScreen } from "@/features/office/screens/AtmImmersiveScreen";
@@ -2870,7 +2871,24 @@ export function RetroOffice3D({
           status: agent.status,
         };
       }
-      setRenderAgentUiById(next);
+      // Only publish a new object when something actually changed; an
+      // unconditional set re-renders the whole scene every 250ms and can
+      // trip React's nested-update guard on slower (software GL) machines.
+      setRenderAgentUiById((prev) => {
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(next);
+        if (
+          prevKeys.length === nextKeys.length &&
+          nextKeys.every(
+            (id) =>
+              prev[id]?.state === next[id].state &&
+              prev[id]?.status === next[id].status,
+          )
+        ) {
+          return prev;
+        }
+        return next;
+      });
     };
 
     syncRenderAgentUi();
@@ -5272,7 +5290,7 @@ export function RetroOffice3D({
 
             {/* Environment lighting — async, wrapped in its own Suspense so floor stays visible. */}
             <Suspense fallback={null}>
-              <Environment preset="city" />
+              <OfflineEnvironment />
             </Suspense>
 
             {/* Furniture models — each loads its GLB asynchronously. */}
