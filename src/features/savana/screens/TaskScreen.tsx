@@ -33,6 +33,14 @@ const ARTIFACT_KINDS: { value: Artifact["kind"]; label: string; placeholder: str
   { value: "relatorio", label: "Relatório", placeholder: "Resumo do resultado" },
 ];
 
+const RUN_STATUS_LABEL: Record<string, string> = {
+  planejado: "Planejada",
+  executando: "Executando",
+  concluido: "Concluída",
+  falhou: "Falhou",
+  cancelado: "Cancelada",
+};
+
 export function TaskScreen({ taskId }: { taskId: string }) {
   const load = useCallback(() => savanaApi.task(taskId), [taskId]);
   const { data, error, reload, realtime } = useLiveResource(load);
@@ -77,6 +85,7 @@ export function TaskScreen({ taskId }: { taskId: string }) {
   };
 
   const task = data?.task;
+  const activeRun = data?.runs.find((r) => r.status === "executando") ?? null;
   const agent = task ? getAgentDefinition(task.agentId) : undefined;
   const pendingApproval = data?.approvals.some((a) => a.status === "pendente") ?? false;
   const nextStatuses = task
@@ -184,19 +193,21 @@ export function TaskScreen({ taskId }: { taskId: string }) {
               <Panel title="Execuções do runtime">
                 {data.runs.length === 0 ? (
                   <EmptyState>
-                    Nenhuma execução registrada. Quando um runtime real (Claude Code) estiver ativo, cada tentativa aparece aqui
-                    com prompt, worktree, arquivos alterados e resultado.
+                    Nenhuma execução registrada. Quando a IA (Claude Code) executar esta tarefa, cada tentativa aparece aqui
+                    com prompt, pasta de trabalho, arquivos produzidos, custo e resultado.
                   </EmptyState>
                 ) : (
                   <ul className="space-y-3">
                     {data.runs.map((r) => (
                       <li key={r.id} className="rounded-xl border border-savana-ivory/10 bg-savana-graphite/50 p-3 text-sm">
                         <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="rounded border border-savana-gold/40 px-1.5 text-savana-gold">{r.status}</span>
+                          <span className="rounded border border-savana-gold/40 px-1.5 text-savana-gold">{RUN_STATUS_LABEL[r.status] ?? r.status}</span>
                           <span className="text-savana-ivory/50">{r.runtime}</span>
                           <span className="ml-auto text-savana-ivory/40">{formatDateTime(r.createdAt)}</span>
                         </div>
                         {r.branch ? <p className="mt-2 text-xs text-savana-ivory/60">Branch {r.branch} · Worktree {r.worktreePath}</p> : null}
+                        {!r.branch && r.worktreePath ? <p className="mt-2 break-all text-xs text-savana-ivory/50">Pasta: {r.worktreePath}</p> : null}
+                        {r.filesChanged.length > 0 ? <p className="mt-1 text-xs text-savana-ivory/60">Arquivos: {r.filesChanged.join(", ")}</p> : null}
                         {r.resultSummary ? <p className="mt-1 text-xs text-savana-ivory/70">{r.resultSummary}</p> : null}
                         <details className="mt-2">
                           <summary className="cursor-pointer text-xs text-savana-gold">Prompt registrado</summary>
@@ -212,6 +223,65 @@ export function TaskScreen({ taskId }: { taskId: string }) {
             </div>
 
             <aside className="space-y-6">
+              {runtime?.supportsManualRun ? (
+                <Panel title="Execução com IA (Claude Code)">
+                  {activeRun ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="flex items-center gap-2 text-sm text-[#9fe0bd]">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#5fb38a]" /> {agent?.name} está executando esta tarefa…
+                      </span>
+                      <Button variant="danger" onClick={() => void run(() => savanaApi.cancelRun(taskId))}>
+                        Cancelar execução
+                      </Button>
+                    </div>
+                  ) : !runtime.canExecute ? (
+                    <p className="text-sm text-savana-ivory/65">
+                      A IA ainda não está pronta neste computador. Veja &quot;Como ativar agentes reais&quot; no topo da página.
+                    </p>
+                  ) : !runtime.runnableAgents?.includes(task.agentId) ? (
+                    <p className="text-sm text-savana-ivory/65">
+                      {agent?.name} ainda não executa com IA nesta versão. Tarefas de código precisam de pasta Git isolada e
+                      aprovação de commit/push, que serão a próxima etapa.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-savana-ivory/75">
+                        {agent?.name} vai ler o briefing e escrever a entrega em uma pasta isolada desta tarefa. Ele não tem
+                        terminal nem internet e não pode publicar, enviar mensagens ou usar senhas. O resultado volta como
+                        &quot;Em revisão&quot; para você conferir. <strong>Cada execução consome sua conta do Claude.</strong>
+                      </p>
+                      <Button
+                        variant="gold"
+                        disabled={!["na_fila", "bloqueado", "falhou"].includes(task.status)}
+                        title={
+                          ["na_fila", "bloqueado", "falhou"].includes(task.status)
+                            ? "Iniciar a execução real"
+                            : "Só é possível executar tarefas na fila, bloqueadas ou que falharam"
+                        }
+                        onClick={() => void run(() => savanaApi.startRun(taskId))}
+                      >
+                        Executar com IA
+                      </Button>
+                    </div>
+                  )}
+                  {data.logs.length > 0 ? (
+                    <details className="mt-4" open={Boolean(activeRun)}>
+                      <summary className="cursor-pointer text-xs text-savana-gold">Log da execução ({data.logs.length})</summary>
+                      <ul className="mt-2 max-h-72 space-y-1 overflow-y-auto font-mono text-[11px]">
+                        {data.logs.map((l) => (
+                          <li key={l.id} className="flex gap-3">
+                            <span className="shrink-0 text-savana-ivory/40">{formatDateTime(l.createdAt)}</span>
+                            <span className={l.level === "erro" ? "text-[#f0aaa1]" : l.level === "aviso" ? "text-savana-gold" : "text-savana-ivory/75"}>
+                              {l.message}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : null}
+                </Panel>
+              ) : null}
+
               <Panel title="Status">
                 {pendingApproval ? (
                   <p className="mb-3 text-xs text-savana-gold">Há uma aprovação pendente: decida abaixo antes de avançar.</p>
@@ -235,6 +305,10 @@ export function TaskScreen({ taskId }: { taskId: string }) {
                       </Button>
                     </div>
                   </form>
+                ) : activeRun ? (
+                  <p className="text-sm text-savana-ivory/65">
+                    Status bloqueado durante a execução. Para interromper, use &quot;Cancelar execução&quot;.
+                  </p>
                 ) : nextStatuses.length === 0 ? (
                   <EmptyState>Sem transições disponíveis.</EmptyState>
                 ) : (

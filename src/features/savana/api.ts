@@ -4,6 +4,7 @@ import type {
   Artifact,
   CreateTaskInput,
   Overview,
+  Run,
   Subtask,
   Task,
   TaskDetail,
@@ -65,6 +66,10 @@ export const savanaApi = {
     request<Subtask>(`/subtasks/${encodeURIComponent(id)}`, { method: "POST", body: { done } }),
   addArtifact: (id: string, artifact: Pick<Artifact, "kind" | "title" | "content">) =>
     request<Artifact>(`/tasks/${encodeURIComponent(id)}/artifacts`, { method: "POST", body: artifact }),
+  startRun: (id: string) =>
+    request<Run>(`/tasks/${encodeURIComponent(id)}/run`, { method: "POST", body: {} }),
+  cancelRun: (id: string) =>
+    request<{ ok: boolean }>(`/tasks/${encodeURIComponent(id)}/run/cancel`, { method: "POST", body: {} }),
   decide: (id: string, decision: "aprovada" | "rejeitada", note?: string) =>
     request<Approval>(`/approvals/${encodeURIComponent(id)}/decision`, {
       method: "POST",

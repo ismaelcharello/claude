@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { isAgentId } from "../../src/lib/savana/agents";
 import { isTaskStatus, validateCreateTask, cleanText } from "../../src/lib/savana/validation";
 import { SavanaError, type SavanaService } from "./service";
+import type { AgentRuntime } from "./runtime/types";
 
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -70,7 +71,7 @@ const compile = (path: string) => {
  * Mutating routes require a JSON content type, which also blocks simple
  * cross-site form posts.
  */
-export const createApiHandler = (service: SavanaService) => {
+export const createApiHandler = (service: SavanaService, runtime?: AgentRuntime) => {
   const routes: Route[] = [];
   const add = (method: string, path: string, handler: Handler, status?: number) =>
     routes.push({ method, ...compile(path), handler, status });
@@ -140,6 +141,24 @@ export const createApiHandler = (service: SavanaService) => {
     },
     201
   );
+  add(
+    "POST",
+    "/api/tasks/:id/run",
+    async ({ params, body }) => {
+      await body(); // requires a JSON request (blocks simple cross-site form posts)
+      if (!runtime?.startRun) {
+        throw new SavanaError("O runtime atual não executa tarefas. Inicie com `npm run savana:ia`.", 409, "runtime_unavailable");
+      }
+      return runtime.startRun(params.id);
+    },
+    202
+  );
+  add("POST", "/api/tasks/:id/run/cancel", async ({ params, body }) => {
+    await body();
+    if (!runtime?.cancelRun) throw new SavanaError("Nada para cancelar.", 409, "not_running");
+    runtime.cancelRun(params.id);
+    return { ok: true };
+  });
   add("GET", "/api/approvals", ({ query }) => {
     const status = query.get("status") ?? undefined;
     if (status && !["pendente", "aprovada", "rejeitada"].includes(status)) {

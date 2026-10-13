@@ -43,28 +43,26 @@ Ativado só com `npm run savana:demo` (ou `SAVANA_RUNTIME=demo`).
 - Usa um banco separado (`data/savana-demo.db`) e configurações de Studio separadas (`data/studio-demo`), então nunca se mistura com dados reais.
 - O chat do escritório nesse modo devolve respostas pré-programadas, identificadas como tal.
 
-## 3. Arquitetura preparada para Claude Code 🧱
+## 3. Execução real com Claude Code ✅ (NEXO, ATLAS, LUME, PULSO)
 
-Arquivos: `savana/server/runtime/types.ts` (contrato), `runtime/claudeCode.ts`, `runtime/safety.ts`, tabela `runs` em `savana/server/db.ts`.
+Iniciar com `npm run savana:ia` (equivale a `SAVANA_RUNTIME=claude-code` + `SAVANA_CLAUDE_CODE_ENABLED=true`).
 
-Já existe:
-- Contrato `AgentRuntime` — runtimes só reagem a eventos e escrevem pelo `SavanaService`, então máquina de estados e gate de aprovação valem para qualquer runtime.
-- Verificação de requisitos (exibida em "Como ativar agentes reais").
-- Plano de worktree isolada por tarefa de código: branch `savana/<agente>/<id>`, pasta dentro de `SAVANA_WORKTREE_ROOT`, caminho validado para não escapar da raiz.
-- Prompt por agente montado a partir de missão, briefing e permissões (livre / exige aprovação / proibido), registrado na execução.
-- Registro de execução (`runs`): prompt, worktree, branch, comando, arquivos alterados, resumo do resultado, exit code, horários.
-- Com `SAVANA_RUNTIME=claude-code`, cada nova tarefa gera uma execução com status **planejado**. Nenhum processo é iniciado.
+- **Só por clique humano**: nenhuma tarefa roda sozinha; o botão "Executar com IA" fica na página da tarefa.
+- **Pasta isolada por tarefa** (`data/workspaces/<id>`), com o briefing em `BRIEFING.md` e a entrega em `resultado.md`.
+- **Ferramentas**: só `Read, Write, Edit, Glob, Grep`. Proibidas: `Bash, WebFetch, WebSearch, Task, NotebookEdit`. Sem terminal e sem internet, publicar, enviar mensagens, fazer commit/push ou usar credenciais é **impossível por construção**; o agente lista essas ações em "Ações que precisam de aprovação".
+- **Ambiente do processo filtrado**: só PATH/HOME/idioma/proxy e `ANTHROPIC_API_KEY` (se existir). Nenhum outro segredo do servidor chega ao agente (coberto por teste).
+- **Registro**: prompt, comando, pasta, arquivos produzidos, custo informado, código de saída, log ao vivo (texto e ferramentas usadas) e linha do tempo.
+- **Ciclo de status**: na fila → preparando → trabalhando → em revisão (sucesso) | falhou (erro, limite de turnos, sem `resultado.md`, tempo-limite) | bloqueado (cancelado por você). Quem conclui é sempre o humano.
+- **Controles**: cancelar a qualquer momento; tempo-limite (`SAVANA_RUN_TIMEOUT_MS`, padrão 10 min); limite de turnos (`SAVANA_MAX_TURNS`, padrão 25); uma execução por tarefa; execuções interrompidas por reinício do servidor são marcadas como falha.
+- **Testes**: executor coberto com um binário `claude` falso (sucesso, falha, sem resultado, cancelamento, tempo-limite, duplicidade, FORJA bloqueado, segredo não vazado). Nenhum teste chamou o modelo real.
 
-## 4. O que falta para ativar agentes Claude Code reais ⏳
+## 4. O que ainda falta ⏳
 
-1. **Executor de processos** (`runtime/claudeCode.ts`): iniciar `claude -p` por tarefa com `--output-format stream-json`, `cwd` na worktree, `--allowedTools` restrito por agente e `--disallowedTools` para git commit/push, gh, rede e comandos de `safety.ts`; ler o stream e gravar logs, arquivos alterados (`git diff --name-only`) e resultado no `runs`.
-2. **Criação/limpeza de worktrees** com `git worktree add/remove` a partir do plano já gerado (somente dentro de `SAVANA_WORKTREE_ROOT`).
-3. **Ponte de aprovação**: quando o agente quiser commit/push/PR/mensagem/credencial, pausar a execução, chamar `requestApproval` e só continuar após decisão humana; executar a ação aprovada pelo backend, não pelo agente.
-4. **Cancelamento e timeout** por execução, com limite de custo/tempo por tarefa.
-5. **Autenticação** da interface antes de qualquer uso fora de `localhost` (hoje o backend recusa hosts que não sejam loopback).
-6. Configurar no computador que roda o backend: Claude Code instalado e logado, `SAVANA_REPO_ROOT`, `SAVANA_WORKTREE_ROOT` (fora do repositório) e, por último, `SAVANA_CLAUDE_CODE_ENABLED=true`.
-
-Para os agentes não técnicos (NEXO, ATLAS, LUME, PULSO), o mesmo executor serve com uma pasta de trabalho de documentos em vez de worktree de código; integrações com CRM, redes ou mensagens exigem conectores próprios e passam sempre pelo gate de aprovação.
+1. **Primeiro teste com o Claude Code real no Mac do Ismael** (instalação + login + `npm run savana:ia` + tarefa inofensiva). O executor só foi testado com o binário falso neste ambiente.
+2. **FORJA (código)**: criar/remover worktree Git isolada a partir do plano já existente (`planWorktree`), liberar `Bash` restrito a comandos de teste, e transformar commit/push em ações executadas **pelo backend** somente após aprovação.
+3. **Ponte de aprovação durante a execução** (pausar o agente e retomar após decisão). Hoje as ações sensíveis simplesmente não estão disponíveis ao agente.
+4. **Anexos**: permitir colocar documentos de entrada na pasta da tarefa pela interface (hoje o insumo é o briefing).
+5. **Autenticação** da interface antes de qualquer uso fora de `localhost`.
 
 ## 5. Limitações conhecidas
 

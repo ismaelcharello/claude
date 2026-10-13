@@ -20,9 +20,10 @@ const SECTIONS = [
   { id: "aprovacoes", title: "6. Aprovações" },
   { id: "estados", title: "7. O que significa cada status" },
   { id: "escritorio", title: "8. Usando o escritório 3D" },
-  { id: "modos", title: "9. Modo demonstração x modo real" },
-  { id: "rotina", title: "10. Rotina sugerida" },
-  { id: "duvidas", title: "11. Dúvidas frequentes" },
+  { id: "modos", title: "9. Os três modos" },
+  { id: "ligar-ia", title: "10. Ligar a IA (passo a passo)" },
+  { id: "rotina", title: "11. Rotina sugerida" },
+  { id: "duvidas", title: "12. Dúvidas frequentes" },
 ];
 
 const Section = ({ id, title, children }: { id: string; title: string; children: ReactNode }) => (
@@ -274,7 +275,7 @@ export function GuideScreen() {
             </ul>
           </Section>
 
-          <Section id="modos" title="9. Modo demonstração x modo real">
+          <Section id="modos" title="9. Os três modos">
             <ul className="space-y-3">
               <li>
                 <B>Modo real</B> (<code className="text-savana-gold">npm run savana</code>): tarefas, aprovações e histórico são
@@ -287,12 +288,62 @@ export function GuideScreen() {
                 aparece marcado como <B>SIMULADO</B> e fica num banco separado — nada vai para o modo real.
               </li>
               <li>
+                <B>Modo com IA</B> (<code className="text-savana-gold">npm run savana:ia</code>): igual ao modo real, mas
+                NEXO, ATLAS, LUME e PULSO podem executar tarefas de verdade com o Claude Code, sempre que você clicar em{" "}
+                <B>Executar com IA</B> na página da tarefa. Usa o mesmo banco do modo real.
+              </li>
+              <li>
                 O banner no topo de todas as telas sempre mostra em qual modo você está.
               </li>
             </ul>
           </Section>
 
-          <Section id="rotina" title="10. Rotina sugerida">
+          <Section id="ligar-ia" title="10. Ligar a IA (passo a passo)">
+            <p>Faça isto uma vez no seu Mac. Você vai usar o Terminal só para estes comandos.</p>
+            <ol className="space-y-3">
+              <Step n={1}>
+                Instale o Claude Code. No Terminal, cole:{" "}
+                <code className="rounded bg-black/30 px-1.5 py-0.5 text-savana-gold">npm install -g @anthropic-ai/claude-code</code>
+              </Step>
+              <Step n={2}>
+                Faça login: digite <code className="rounded bg-black/30 px-1.5 py-0.5 text-savana-gold">claude</code>, aperte
+                Enter e siga as instruções para entrar com a sua conta do Claude. Depois feche com <B>Ctrl + C</B>.
+              </Step>
+              <Step n={3}>
+                Na pasta da Savana, inicie o sistema com IA:{" "}
+                <code className="rounded bg-black/30 px-1.5 py-0.5 text-savana-gold">npm run savana:ia</code>
+              </Step>
+              <Step n={4}>
+                O banner deve mostrar <B>Claude Code conectado</B>. Se não mostrar, clique em &quot;Como ativar agentes
+                reais&quot; para ver o que falta.
+              </Step>
+              <Step n={5}>
+                Faça um <B>teste inofensivo</B>: crie uma tarefa para o ATLAS como &quot;Resumir este texto em 3
+                tópicos&quot; e cole um texto qualquer (sem dados privados) no briefing. Abra a tarefa e clique em{" "}
+                <B>Executar com IA</B>.
+              </Step>
+              <Step n={6}>
+                Acompanhe o log ao vivo. Em alguns minutos a tarefa vai para <TaskStatusBadge status="em_revisao" /> e o
+                resultado aparece em <B>Artefatos</B>. Confira e clique em <B>→ Concluída</B> se estiver bom.
+              </Step>
+            </ol>
+            <p className="text-sm text-savana-ivory/65">
+              <B>Segurança:</B> cada tarefa roda numa pasta própria (<code>data/workspaces/</code>), com permissão só para
+              ler e escrever arquivos ali. O agente não tem terminal nem internet e não consegue publicar, enviar mensagens,
+              fazer commit ou usar senhas; se achar que algo precisa disso, ele lista em &quot;Ações que precisam de
+              aprovação&quot; no resultado. Você pode <B>cancelar</B> a qualquer momento, e há um tempo-limite de 10 minutos.
+            </p>
+            <p className="text-sm text-savana-ivory/65">
+              <B>Custo:</B> cada execução usa a sua conta do Claude (assinatura ou créditos). O custo informado aparece no
+              resumo da execução quando disponível.
+            </p>
+            <p className="text-sm text-savana-ivory/65">
+              <B>Ainda não:</B> o FORJA (código) só vai executar quando tivermos a pasta Git isolada e a aprovação de
+              commit/push funcionando.
+            </p>
+          </Section>
+
+          <Section id="rotina" title="11. Rotina sugerida">
             <ol className="space-y-3">
               <Step n={1}>De manhã, abra a Central e resolva primeiro as <B>Aprovações pendentes</B> e os <B>Bloqueios</B>.</Step>
               <Step n={2}>Crie as tarefas do dia. Coisas grandes ou confusas: mande para o NEXO organizar.</Step>
@@ -301,13 +352,13 @@ export function GuideScreen() {
             </ol>
           </Section>
 
-          <Section id="duvidas" title="11. Dúvidas frequentes">
+          <Section id="duvidas" title="12. Dúvidas frequentes">
             <dl className="space-y-4">
               <div>
                 <dt className="font-semibold text-savana-gold">Criei uma tarefa e nada aconteceu. Está quebrado?</dt>
                 <dd className="text-savana-ivory/75">
-                  Não. No modo real, ainda não há IA conectada aos agentes, então a tarefa fica na fila e a linha do tempo diz
-                  isso. Você pode movê-la manualmente. A execução automática chega quando o Claude Code for ativado.
+                  Não. Nenhuma tarefa roda sozinha. No modo real sem IA ela fica na fila e você a move manualmente. No modo
+                  com IA (<code>npm run savana:ia</code>), abra a tarefa e clique em <B>Executar com IA</B>.
                 </dd>
               </div>
               <div>

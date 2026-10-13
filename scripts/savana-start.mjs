@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const demo = process.argv.includes("--demo");
+const ia = process.argv.includes("--ia");
 
 // Minimal .env loader (KEY=VALUE lines); real environment variables win.
 const envFile = path.join(root, ".env");
@@ -33,6 +34,8 @@ const env = {
   SAVANA_API_PORT: apiPort,
   SAVANA_DATA_DIR: dataDir,
   ...(demo ? { SAVANA_RUNTIME: "demo" } : {}),
+  // Real AI: each task still only runs when you click "Executar com IA".
+  ...(ia ? { SAVANA_RUNTIME: "claude-code", SAVANA_CLAUDE_CODE_ENABLED: "true" } : {}),
   // The 3D office connects to the Savana backend through the Claw3D gateway protocol.
   CLAW3D_GATEWAY_URL: `ws://localhost:${apiPort}/gateway`,
   CLAW3D_GATEWAY_ADAPTER_TYPE: "demo",
@@ -63,6 +66,8 @@ const shutdown = (code = 0) => {
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
-console.log(`[savana] Iniciando ${demo ? "em MODO DEMONSTRAÇÃO" : "(runtime de agentes não configurado)"}…`);
+console.log(
+  `[savana] Iniciando ${demo ? "em MODO DEMONSTRAÇÃO" : ia ? "com IA (Claude Code) — execução só por clique" : "(runtime de agentes não configurado)"}…`
+);
 run("backend", ["--import", "tsx", "savana/server/main.ts"]);
 run("studio", ["server/index.js", "--dev"]);

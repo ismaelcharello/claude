@@ -13,6 +13,8 @@ npm install
 npm run savana          # runtime não configurado (padrão: nada é executado)
 # ou
 npm run savana:demo     # modo demonstração (atividade simulada, banco separado)
+# ou
+npm run savana:ia       # IA real (Claude Code), execução só por clique
 ```
 
 Abra:
@@ -48,7 +50,7 @@ Estados de agente: offline, disponível, preparando, trabalhando, bloqueado, agu
 | --- | --- | --- |
 | Runtime não configurado | `npm run savana` (padrão) | Tarefas, aprovações e histórico funcionam e persistem. Nenhum agente executa nada; a tarefa registra isso honestamente. |
 | Demonstração | `npm run savana:demo` | Um roteiro fixo move as tarefas pelos estados. Tudo é marcado **SIMULADO** e fica em `data/savana-demo.db`. |
-| Claude Code | `SAVANA_RUNTIME=claude-code` | Apenas arquitetura: registra o plano de execução (prompt, worktree, comando) e lista requisitos pendentes. Não executa nada nesta versão. |
+| Com IA (Claude Code) | `npm run savana:ia` | NEXO, ATLAS, LUME e PULSO executam de verdade quando você clica em "Executar com IA", numa pasta isolada, sem terminal nem internet; o resultado volta para revisão. FORJA (código) ainda não. Requer Claude Code instalado e logado. |
 
 Detalhes, limites e o caminho para agentes reais: [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md).
 

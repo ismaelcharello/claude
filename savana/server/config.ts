@@ -11,6 +11,14 @@ export type SavanaConfig = {
   repoRoot: string | null;
   worktreeRoot: string | null;
   claudeCodeEnabled: boolean;
+  /** Claude Code binary: a name looked up on PATH, or an absolute path. */
+  claudeBin: string;
+  /** Hard time limit for one agent execution. */
+  runTimeoutMs: number;
+  /** Maximum agent turns per execution (cost guard). */
+  maxTurns: number;
+  /** Isolated working folders, one per task (non-code agents). */
+  workspacesDir: string;
   /** Origins allowed to open the realtime WebSocket. */
   allowedOrigins: string[];
 };
@@ -48,6 +56,10 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): SavanaConfig =
     repoRoot: env.SAVANA_REPO_ROOT?.trim() ? path.resolve(env.SAVANA_REPO_ROOT.trim()) : null,
     worktreeRoot: env.SAVANA_WORKTREE_ROOT?.trim() ? path.resolve(env.SAVANA_WORKTREE_ROOT.trim()) : null,
     claudeCodeEnabled: env.SAVANA_CLAUDE_CODE_ENABLED === "true",
+    claudeBin: env.SAVANA_CLAUDE_BIN?.trim() || "claude",
+    runTimeoutMs: Math.max(10_000, Number.parseInt(env.SAVANA_RUN_TIMEOUT_MS ?? "600000", 10) || 600_000),
+    maxTurns: Math.min(100, Math.max(1, Number.parseInt(env.SAVANA_MAX_TURNS ?? "25", 10) || 25)),
+    workspacesDir: path.join(dataDir, "workspaces"),
     // Studio (browser) origin, plus the backend's own origin, which the Studio
     // gateway proxy sends when it connects server-side to /gateway.
     allowedOrigins: [studioPort, port].flatMap((p) => [`http://localhost:${p}`, `http://127.0.0.1:${p}`]),

@@ -13,7 +13,7 @@ export const createSavanaApp = (config: SavanaConfig, options: { dbPath?: string
   const service = new SavanaService(db);
   const runtime = createRuntime(service, config);
   const office = new OfficeGateway(service);
-  const api = createApiHandler(service);
+  const api = createApiHandler(service, runtime);
 
   const server = http.createServer((req, res) => {
     void api(req, res);

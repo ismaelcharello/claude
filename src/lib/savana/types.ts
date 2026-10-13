@@ -173,6 +173,10 @@ export type RuntimeInfo = {
   summary: string;
   requirements: RuntimeRequirement[];
   nextSteps: string[];
+  /** True when tasks can be started on demand ("Executar com IA"). */
+  supportsManualRun?: boolean;
+  /** Agents the manual run supports (others are explained in the UI). */
+  runnableAgents?: AgentId[];
 };
 
 /** A (future) runtime execution attempt. `planejado` = prepared but not executed. */
@@ -201,6 +205,7 @@ export type TaskDetail = {
   approvals: Approval[];
   artifacts: Artifact[];
   runs: Run[];
+  logs: AgentLog[];
 };
 
 export type AgentDetail = {

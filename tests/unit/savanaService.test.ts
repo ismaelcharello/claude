@@ -173,16 +173,14 @@ describe("runtime não configurado", () => {
     expect(detail.timeline.every((e) => !e.simulated)).toBe(true);
   });
 
-  it("modo Claude Code apenas planeja e lista requisitos pendentes", () => {
-    const { service } = makeApp({ SAVANA_RUNTIME: "claude-code" });
+  it("modo Claude Code sem habilitar não executa e lista requisitos", () => {
+    const { service, runtime } = makeApp({ SAVANA_RUNTIME: "claude-code", SAVANA_CLAUDE_BIN: "/nao/existe/claude" });
     const info = service.getRuntimeInfo();
     expect(info.canExecute).toBe(false);
     expect(info.requirements.some((r) => !r.ok)).toBe(true);
-    const task = service.createTask(input({ agentId: "forja" }));
-    const [run] = service.getTaskDetail(task.id).runs;
-    expect(run.status).toBe("planejado");
-    expect(run.startedAt).toBeNull();
-    expect(run.prompt).toMatch(/aprovação/);
+    const task = service.createTask(input({ agentId: "atlas" }));
+    expect(() => runtime.startRun!(task.id)).toThrow(/não está pronto/);
+    expect(service.getTaskDetail(task.id).runs).toHaveLength(0);
   });
 });
 
@@ -235,5 +233,124 @@ describe("segurança", () => {
     expect(officeActivityFor("offline")).toBe("idle");
     expect(officeActivityFor("trabalhando")).toBe("running");
     expect(officeActivityFor("falhou")).toBe("error");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Executor real do Claude Code, testado com um binário falso que imita a
+// saída stream-json do CLI (nenhuma conta ou modelo é usado nos testes).
+// ---------------------------------------------------------------------------
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+const FAKE_CLAUDE = `#!/usr/bin/env node
+const fs = require("fs");
+const briefing = fs.readFileSync("BRIEFING.md", "utf8");
+fs.writeFileSync(".args.json", JSON.stringify({ argv: process.argv.slice(2), env: Object.keys(process.env) }));
+const out = (o) => process.stdout.write(JSON.stringify(o) + "\\n");
+out({ type: "system", subtype: "init" });
+if (briefing.includes("MODO:lento")) { setTimeout(() => {}, 60000); return; }
+if (briefing.includes("MODO:falha")) {
+  out({ type: "result", subtype: "error_max_turns", is_error: true, result: "Limite de turnos" });
+  process.exit(1);
+}
+out({ type: "assistant", message: { content: [{ type: "text", text: "Lendo o briefing" }, { type: "tool_use", name: "Write", input: { file_path: process.cwd() + "/resultado.md" } }] } });
+if (!briefing.includes("MODO:sem-resultado")) fs.writeFileSync("resultado.md", "## Resumo\\nResultado de teste");
+out({ type: "result", subtype: "success", is_error: false, result: "Pronto", total_cost_usd: 0.0123 });
+`;
+
+const makeRealApp = (extra: Record<string, string> = {}) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "savana-cc-"));
+  const bin = path.join(dir, "claude");
+  fs.writeFileSync(bin, FAKE_CLAUDE, { mode: 0o755 });
+  return makeApp({
+    SAVANA_RUNTIME: "claude-code",
+    SAVANA_CLAUDE_CODE_ENABLED: "true",
+    SAVANA_CLAUDE_BIN: bin,
+    SAVANA_DATA_DIR: dir,
+    ...extra,
+  });
+};
+
+const waitRunEnd = async (app: App, taskId: string) => {
+  for (let i = 0; i < 200; i++) {
+    const runs = app.service.getTaskDetail(taskId).runs;
+    if (runs.length && runs[0].status !== "executando") return runs[0];
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error("run did not finish");
+};
+
+describe("execução real com Claude Code", () => {
+  it("só executa quando pedido, registra tudo e devolve para revisão", async () => {
+    const app = makeRealApp();
+    expect(app.service.getRuntimeInfo().canExecute).toBe(true);
+    const task = app.service.createTask(input({ agentId: "atlas", briefing: "Resumir o documento de teste em 3 linhas." }));
+    expect(app.service.getTask(task.id).status).toBe("na_fila"); // nada roda sozinho
+    process.env.SAVANA_TEST_SECRET = "nao-pode-vazar";
+    app.runtime.startRun!(task.id);
+    expect(() => app.runtime.startRun!(task.id)).toThrow(/já está em execução/);
+    const run = await waitRunEnd(app, task.id);
+    delete process.env.SAVANA_TEST_SECRET;
+    expect(run.status).toBe("concluido");
+    expect(run.filesChanged).toContain("resultado.md");
+    expect(run.resultSummary).toMatch(/0\.0123/);
+    const detail = app.service.getTaskDetail(task.id);
+    expect(detail.task.status).toBe("em_revisao");
+    expect(detail.artifacts[0].content).toMatch(/Resultado de teste/);
+    expect(detail.logs.some((l) => l.message.includes("Usando Write"))).toBe(true);
+    const recorded = JSON.parse(fs.readFileSync(path.join(run.worktreePath!, ".args.json"), "utf8"));
+    expect(recorded.argv.join(" ")).toMatch(/--disallowedTools Bash,WebFetch,WebSearch/);
+    expect(recorded.env).not.toContain("SAVANA_TEST_SECRET");
+  });
+
+  it("marca falha com o motivo e permite tentar de novo", async () => {
+    const app = makeRealApp();
+    const task = app.service.createTask(input({ agentId: "lume", briefing: "Teste de erro MODO:falha no agente." }));
+    app.runtime.startRun!(task.id);
+    const run = await waitRunEnd(app, task.id);
+    expect(run.status).toBe("falhou");
+    expect(app.service.getTask(task.id).status).toBe("falhou");
+    expect(run.resultSummary).toMatch(/Limite de turnos/);
+  });
+
+  it("falha se o agente não gerar o arquivo de resultado", async () => {
+    const app = makeRealApp();
+    const task = app.service.createTask(input({ agentId: "pulso", briefing: "Teste MODO:sem-resultado do agente." }));
+    app.runtime.startRun!(task.id);
+    const run = await waitRunEnd(app, task.id);
+    expect(run.status).toBe("falhou");
+    expect(run.resultSummary).toMatch(/sem gerar resultado\.md/);
+  });
+
+  it("cancela uma execução em andamento", async () => {
+    const app = makeRealApp();
+    const task = app.service.createTask(input({ agentId: "nexo", briefing: "Teste MODO:lento para cancelar." }));
+    app.runtime.startRun!(task.id);
+    await new Promise((r) => setTimeout(r, 300));
+    app.runtime.cancelRun!(task.id);
+    const run = await waitRunEnd(app, task.id);
+    expect(run.status).toBe("cancelado");
+    const after = app.service.getTask(task.id);
+    expect(after.status).toBe("bloqueado");
+    expect(after.blockedReason).toMatch(/cancelada/);
+  });
+
+  it("respeita o tempo-limite", async () => {
+    const app = makeRealApp({ SAVANA_RUN_TIMEOUT_MS: "10000" });
+    // forces a short timeout directly on the config used by the runtime
+    (app.runtime as unknown as { config: { runTimeoutMs: number } }).config.runTimeoutMs = 300;
+    const task = app.service.createTask(input({ agentId: "atlas", briefing: "Teste MODO:lento para tempo-limite." }));
+    app.runtime.startRun!(task.id);
+    const run = await waitRunEnd(app, task.id);
+    expect(run.status).toBe("falhou");
+    expect(run.resultSummary).toMatch(/Tempo-limite/);
+  });
+
+  it("não executa FORJA nesta versão", () => {
+    const app = makeRealApp();
+    const task = app.service.createTask(input({ agentId: "forja" }));
+    expect(() => app.runtime.startRun!(task.id)).toThrow(/FORJA/);
   });
 });

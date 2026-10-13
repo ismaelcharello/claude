@@ -1,4 +1,4 @@
-import type { Approval, RuntimeInfo, Task } from "../../../src/lib/savana/types";
+import type { Approval, Run, RuntimeInfo, Task } from "../../../src/lib/savana/types";
 import type { SavanaService } from "../service";
 
 /**
@@ -10,6 +10,9 @@ export interface AgentRuntime {
   info(): RuntimeInfo;
   onTaskCreated(task: Task): void;
   onApprovalResolved(approval: Approval): void;
+  /** Real runtimes only: start / cancel an execution on human request. */
+  startRun?(taskId: string): Run;
+  cancelRun?(taskId: string): void;
   dispose(): void;
 }
 

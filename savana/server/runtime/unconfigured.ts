@@ -31,8 +31,7 @@ export class UnconfiguredRuntime implements AgentRuntime {
       requirements: describeClaudeCodeRequirements(this.config),
       nextSteps: [
         "Para explorar o fluxo completo sem executar nada real, rode `npm run savana:demo` (dados separados, marcados como SIMULADO).",
-        "Para preparar agentes Claude Code, siga a seção 'Ativar Claude Code' do IMPLEMENTATION_STATUS.md.",
-        "Defina SAVANA_RUNTIME=claude-code somente depois de cumprir os requisitos listados acima.",
+        "Para ligar a IA de verdade: instale o Claude Code, faça login e inicie com `npm run savana:ia` (passo a passo no guia, seção 'Ligar a IA').",
       ],
     };
   }

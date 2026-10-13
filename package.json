@@ -7,6 +7,7 @@
     "dev": "node server/index.js --dev",
     "savana": "node scripts/savana-start.mjs",
     "savana:demo": "node scripts/savana-start.mjs --demo",
+    "savana:ia": "node scripts/savana-start.mjs --ia",
     "savana:api": "node --import tsx savana/server/main.ts",
     "dev:https": "node server/index.js --dev --https",
     "hermes-adapter": "node server/hermes-gateway-adapter.js",

@@ -220,6 +220,7 @@ export class SavanaService extends EventEmitter {
       approvals: all("SELECT * FROM approvals WHERE task_id = ? ORDER BY created_at DESC, rowid DESC", mapApproval),
       artifacts: all("SELECT * FROM artifacts WHERE task_id = ? ORDER BY created_at, rowid", mapArtifact),
       runs: all("SELECT * FROM runs WHERE task_id = ? ORDER BY created_at DESC, rowid DESC", mapRun),
+      logs: all("SELECT * FROM agent_logs WHERE task_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 300", mapLog),
     };
   }
 
@@ -685,6 +686,41 @@ export class SavanaService extends EventEmitter {
       );
     this.emitEvent({ type: "run.updated", run: full });
     return full;
+  }
+
+  getRun(id: string): Run {
+    const row = this.db.prepare("SELECT * FROM runs WHERE id = ?").get(id) as Row | undefined;
+    if (!row) throw new SavanaError("Execução não encontrada.", 404, "not_found");
+    return mapRun(row);
+  }
+
+  listRunsByStatus(status: Run["status"]): Run[] {
+    return (this.db.prepare("SELECT * FROM runs WHERE status = ?").all(status) as Row[]).map(mapRun);
+  }
+
+  updateRun(
+    id: string,
+    patch: Partial<Pick<Run, "status" | "filesChanged" | "resultSummary" | "exitCode" | "startedAt" | "finishedAt">>
+  ): Run {
+    const current = this.getRun(id);
+    const next: Run = { ...current, ...patch };
+    this.db
+      .prepare(
+        `UPDATE runs SET status = ?, files_changed_json = ?, result_summary = ?, exit_code = ?, started_at = ?,
+         finished_at = ? WHERE id = ?`
+      )
+      .run(
+        next.status,
+        JSON.stringify(next.filesChanged),
+        next.resultSummary ? redactSecrets(cleanText(next.resultSummary, 4000)) : null,
+        next.exitCode,
+        next.startedAt,
+        next.finishedAt,
+        id
+      );
+    const updated = this.getRun(id);
+    this.emitEvent({ type: "run.updated", run: updated });
+    return updated;
   }
 
   /** Re-broadcast agent snapshots (used by time-based status decay). */
