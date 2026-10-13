@@ -5,6 +5,7 @@ import { useCallback, useState, type FormEvent } from "react";
 import { getAgentDefinition } from "@/lib/savana/agents";
 import { TASK_STATUS_LABEL } from "@/lib/savana/labels";
 import { TASK_TRANSITIONS } from "@/lib/savana/stateMachine";
+import { STATUS_HELP } from "@/lib/savana/guide";
 import type { Artifact, TaskStatus } from "@/lib/savana/types";
 import { savanaApi } from "../api";
 import { ApprovalCard } from "../components/ApprovalCard";
@@ -243,14 +244,18 @@ export function TaskScreen({ taskId }: { taskId: string }) {
                         key={status}
                         variant={status === "concluido" ? "gold" : status === "falhou" || status === "cancelada" ? "danger" : "ghost"}
                         onClick={() => changeStatus(status)}
+                        title={STATUS_HELP[status]}
                       >
                         → {TASK_STATUS_LABEL[status]}
                       </Button>
                     ))}
                   </div>
                 )}
+                <p className="mt-3 text-xs text-savana-ivory/60">
+                  Agora: <span className="text-savana-ivory/85">{STATUS_HELP[task.status]}</span>
+                </p>
                 <p className="mt-4 text-[11px] leading-relaxed text-savana-ivory/45">
-                  Mudanças feitas aqui ficam registradas como suas na linha do tempo.
+                  Passe o mouse sobre um botão para ver o que o status significa. Mudanças feitas aqui ficam registradas como suas na linha do tempo.
                   {runtime && !runtime.canExecute ? " Com o runtime desligado, nenhum agente executa a tarefa — o status é acompanhamento manual." : ""}
                 </p>
               </Panel>

@@ -86,7 +86,7 @@ export function SavanaShell({
   children: ReactNode;
   runtime: RuntimeInfo | null;
   realtime: RealtimeState;
-  active: "central" | "agente" | "tarefa";
+  active: "central" | "agente" | "tarefa" | "guia";
 }) {
   const live = REALTIME_LABEL[realtime];
   return (
@@ -103,6 +103,9 @@ export function SavanaShell({
           <nav className="ml-6 flex items-center gap-1">
             <NavLink href="/savana" active={active === "central"}>
               Central de Comando
+            </NavLink>
+            <NavLink href="/savana/guia" active={active === "guia"}>
+              Como usar
             </NavLink>
             <Link
               href="/office"

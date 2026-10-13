@@ -59,6 +59,8 @@ if (process.env.NODE_ENV === "production") {
 const savanaApiPort = Number.parseInt(process.env.SAVANA_API_PORT ?? "3100", 10) || 3100;
 
 const nextConfig: NextConfig = {
+  // Hide the Next.js dev badge; it overlaps the office status bar.
+  devIndicators: false,
   // Savana backend (savana/server) is a separate local process; the browser
   // only ever talks to this same origin.
   async rewrites() {

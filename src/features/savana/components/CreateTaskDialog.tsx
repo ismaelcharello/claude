@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { SAVANA_AGENTS } from "@/lib/savana/agents";
 import { PRIORITY_LABEL } from "@/lib/savana/labels";
 import { TASK_PRIORITIES, type AgentId, type Task, type TaskPriority } from "@/lib/savana/types";
 import { validateCreateTask } from "@/lib/savana/validation";
+import { AGENT_GUIDE, BRIEFING_TEMPLATE, FIELD_HELP } from "@/lib/savana/guide";
 import { savanaApi } from "../api";
 import { Button, fieldClass } from "./ui";
+
+const Help = ({ children }: { children: ReactNode }) => (
+  <span className="mt-1 block text-[11px] leading-snug text-savana-ivory/45">{children}</span>
+);
 
 export function CreateTaskDialog({
   open,
@@ -85,18 +90,45 @@ export function CreateTaskDialog({
           <label className="md:col-span-2">
             <span className="mb-1 block text-xs text-savana-ivory/70">Título</span>
             <input className={fieldClass} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={160} autoFocus required />
+            <Help>{FIELD_HELP.title}</Help>
           </label>
-          <label className="md:col-span-2">
-            <span className="mb-1 block text-xs text-savana-ivory/70">Briefing</span>
+          <div className="md:col-span-2">
+            <span className="mb-1 flex items-center justify-between text-xs text-savana-ivory/70">
+              <label htmlFor="savana-briefing">Briefing</label>
+              <span className="flex gap-3">
+                <button
+                  type="button"
+                  className="text-savana-gold hover:underline"
+                  onClick={() => setBriefing((current) => (current.trim() ? `${current}\n\n${BRIEFING_TEMPLATE}` : BRIEFING_TEMPLATE))}
+                >
+                  Usar modelo
+                </button>
+                <button
+                  type="button"
+                  className="text-savana-gold hover:underline"
+                  onClick={() => {
+                    const example = AGENT_GUIDE[agentId].examples[0];
+                    setTitle(example.title);
+                    setBriefing(example.briefing);
+                    setPriority(example.priority);
+                    setProject(example.project);
+                  }}
+                >
+                  Preencher com exemplo
+                </button>
+              </span>
+            </span>
             <textarea
+              id="savana-briefing"
               className={`${fieldClass} min-h-[130px]`}
               value={briefing}
               onChange={(e) => setBriefing(e.target.value)}
               maxLength={8000}
-              placeholder="Contexto, objetivo, critérios de pronto, restrições…"
+              placeholder="Contexto, objetivo, entregável, critérios de pronto, restrições…"
               required
             />
-          </label>
+            <Help>{FIELD_HELP.briefing}</Help>
+          </div>
           <label>
             <span className="mb-1 block text-xs text-savana-ivory/70">Agente responsável</span>
             <select className={fieldClass} value={agentId} onChange={(e) => setAgentId(e.target.value as AgentId)}>
@@ -106,6 +138,7 @@ export function CreateTaskDialog({
                 </option>
               ))}
             </select>
+            <Help>{FIELD_HELP.agent}</Help>
           </label>
           <label>
             <span className="mb-1 block text-xs text-savana-ivory/70">Prioridade</span>
@@ -116,6 +149,7 @@ export function CreateTaskDialog({
                 </option>
               ))}
             </select>
+            <Help>{FIELD_HELP.priority}</Help>
           </label>
           <label>
             <span className="mb-1 block text-xs text-savana-ivory/70">Projeto</span>
@@ -133,16 +167,21 @@ export function CreateTaskDialog({
                 <option key={p} value={p} />
               ))}
             </datalist>
+            <Help>{FIELD_HELP.project}</Help>
           </label>
           <label>
             <span className="mb-1 block text-xs text-savana-ivory/70">Prazo (opcional)</span>
             <input type="date" className={fieldClass} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <Help>{FIELD_HELP.dueDate}</Help>
           </label>
         </div>
 
         {agent ? (
           <p className="mt-4 rounded-lg border border-savana-ivory/10 bg-savana-graphite/50 px-3 py-2 text-xs text-savana-ivory/60">
             <span className="font-semibold text-savana-ivory/80">{agent.name}:</span> {agent.mission}
+            <span className="mt-1 block">
+              <span className="font-semibold text-savana-ivory/80">Quando usar:</span> {AGENT_GUIDE[agent.id].whenToUse}
+            </span>
           </p>
         ) : null}
 

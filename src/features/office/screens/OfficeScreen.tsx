@@ -957,7 +957,7 @@ type OfficeScreenProps = {
 };
 
 export function OfficeScreen({
-  showOpenClawConsole = true,
+  showOpenClawConsole = !SAVANA_OFFICE_ENABLED,
 }: OfficeScreenProps) {
   // Patch Hermes Phase 2: avoid useSearchParams() at component root — it
   // suspends during hydration in Next.js dev mode and keeps the parent
@@ -1398,7 +1398,8 @@ export function OfficeScreen({
     voiceId: voiceRepliesPreference.voiceId,
     speed: voiceRepliesPreference.speed,
   });
-  const showOnboardingWizard = showOnboarding || forceShowOnboarding;
+  // Savana skips the Claw3D connection wizard: the launcher wires the gateway.
+  const showOnboardingWizard = !SAVANA_OFFICE_ENABLED && (showOnboarding || forceShowOnboarding);
   const handleOpenOnboarding = useCallback(() => {
     resetOnboarding();
     setCompanyCreatedSignal(0);
@@ -4762,7 +4763,7 @@ export function OfficeScreen({
             <RunningAvatarLoader
               size={28}
               trackWidth={76}
-              label="Connecting to your runtime..."
+              label={SAVANA_OFFICE_ENABLED ? "Conectando ao escritório Savana..." : "Connecting to your runtime..."}
               labelClassName="text-amber-100/80"
             />
           </div>
@@ -4771,6 +4772,25 @@ export function OfficeScreen({
       {showGatewayConnectOverlay ? (
         <div className="pointer-events-auto absolute inset-0 z-50 flex items-start justify-center bg-[#0b130e]/76 px-4 py-10">
           <div className="w-full max-w-[860px] rounded-2xl border border-amber-900/55 bg-[#0b130e]/98 p-3 shadow-2xl">
+            {SAVANA_OFFICE_ENABLED ? (
+              <div className="p-6 font-sans text-[#f4f0e7]">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-[#c8a66a]">Savana Command Center</p>
+                <h2 className="mt-2 text-xl font-semibold">Não foi possível conectar ao escritório</h2>
+                <p className="mt-3 text-sm leading-relaxed text-[#f4f0e7]/75">
+                  O backend da Savana não respondeu. Confira se o terminal onde você rodou{" "}
+                  <code className="text-[#c8a66a]">npm run savana</code> (ou{" "}
+                  <code className="text-[#c8a66a]">npm run savana:demo</code>) continua aberto e sem erros. Se tiver
+                  fechado, rode o comando de novo e recarregue esta página.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void connect()}
+                  className="mt-5 rounded-lg bg-[#c8a66a] px-4 py-2 text-sm font-semibold text-[#131714] hover:bg-[#d6b77d]"
+                >
+                  Tentar de novo
+                </button>
+              </div>
+            ) : (
             <GatewayConnectScreen
               gatewayUrl={gatewayUrl}
               token={token}
@@ -4786,6 +4806,7 @@ export function OfficeScreen({
               onUseLocalDefaults={useLocalGatewayDefaults}
               onConnect={() => void connect()}
             />
+            )}
           </div>
         </div>
       ) : null}
@@ -5101,7 +5122,7 @@ export function OfficeScreen({
         </div>
       ) : null}
 
-      {!debugEnabled ? (
+      {!debugEnabled && !SAVANA_OFFICE_ENABLED ? (
         <HQSidebar
           open={sidebarOpen}
           activeTab={activeSidebarTab}
@@ -5440,7 +5461,9 @@ export function OfficeScreen({
 
       <div
         className={`fixed bottom-3 z-30 flex flex-col items-end gap-2 ${sidebarOpen ? "right-84" : "right-3"} ${
-          debugEnabled ? "hidden" : ""
+          // Savana: there is no language model behind the office chat yet, so
+          // requests go through the Command Center instead.
+          debugEnabled || SAVANA_OFFICE_ENABLED ? "hidden" : ""
         }`}
       >
         {chatOpen && (

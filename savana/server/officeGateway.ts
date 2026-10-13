@@ -283,16 +283,26 @@ export class OfficeGateway {
             policy: { tickIntervalMs: 30000 },
           },
         });
-        // Replay current activity once the office has hydrated its agents.
-        setTimeout(() => {
+        // Replay current activity after the office hydrates its agents. The
+        // office may take a while to load (slow GPUs), so replay a few times and
+        // then keep re-asserting running agents; repeated "start" frames for the
+        // same run are idempotent on the client.
+        const replay = (includeErrors: boolean) => {
           for (const [agentId, runId] of this.runIdByAgent) send(this.lifecycleFrame(agentId, runId, "start"));
+          if (!includeErrors) return;
           for (const [agentId, activity] of this.activityByAgent) {
             if (activity !== "error") continue;
             const runId = randomUUID();
             send(this.lifecycleFrame(agentId, runId, "start"));
             send(this.lifecycleFrame(agentId, runId, "error"));
           }
-        }, 2500);
+        };
+        for (const delay of [2_500, 8_000, 20_000]) {
+          const timer = setTimeout(() => replay(true), delay);
+          ws.once("close", () => clearTimeout(timer));
+        }
+        const keepAlive = setInterval(() => replay(false), 30_000);
+        ws.once("close", () => clearInterval(keepAlive));
         return;
       }
       if (!connected) {

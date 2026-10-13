@@ -28,6 +28,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { OfflineEnvironment } from "./scene/OfflineEnvironment";
 import { formatOfficeConnectionLabel, SAVANA_OFFICE_ENABLED } from "@/lib/savana/office";
+import { getAgentDefinition } from "@/lib/savana/agents";
 import * as THREE from "three";
 import { SettingsPanel } from "@/features/office/components/panels/SettingsPanel";
 import { AtmImmersiveScreen } from "@/features/office/screens/AtmImmersiveScreen";
@@ -2951,6 +2952,8 @@ export function RetroOffice3D({
   const handleAgentContextMenu = useCallback(
     (agentId: string, x: number, y: number) => {
       if (isRemoteOfficeAgentId(agentId)) return;
+      // Savana agents are managed by the backend: no edit/delete menu.
+      if (SAVANA_OFFICE_ENABLED) return;
       setContextMenu({ id: agentId, x, y });
     },
     [],
@@ -5859,17 +5862,17 @@ export function RetroOffice3D({
                 {
                   key: "overview",
                   icon: <Maximize size={12} />,
-                  title: "Overview",
+                  title: SAVANA_OFFICE_ENABLED ? "Visão geral" : "Overview",
                 },
                 {
                   key: "frontDesk",
                   icon: <Monitor size={12} />,
-                  title: "Front desk",
+                  title: SAVANA_OFFICE_ENABLED ? "Recepção" : "Front desk",
                 },
                 {
                   key: "lounge",
                   icon: <Armchair size={12} />,
-                  title: "Lounge",
+                  title: SAVANA_OFFICE_ENABLED ? "Lounge" : "Lounge",
                 },
               ] as const
             ).map(({ key, icon, title }) => (
@@ -5907,7 +5910,7 @@ export function RetroOffice3D({
               </div>
             </button>
           ) : null}
-          {kanbanBoardItem ? (
+          {kanbanBoardItem && !SAVANA_OFFICE_ENABLED ? (
             <button
               type="button"
               onClick={() => openKanbanBoard(kanbanBoardItem)}
@@ -6012,7 +6015,7 @@ export function RetroOffice3D({
             >
               <Users className="h-3.5 w-3.5" />
               <span>{agents.length}</span>
-              <span className="hidden sm:inline">agents</span>
+              <span className="hidden sm:inline">{SAVANA_OFFICE_ENABLED ? "agentes" : "agents"}</span>
             </button>
           </div>
 
@@ -6021,10 +6024,10 @@ export function RetroOffice3D({
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-500/70">
-                    Team roster
+                    {SAVANA_OFFICE_ENABLED ? "Equipe Savana" : "Team roster"}
                   </div>
                   <div className="mt-1 text-sm font-semibold text-amber-100">
-                    Compact view for larger fleets.
+                    {SAVANA_OFFICE_ENABLED ? "Clique em um agente para ver detalhes." : "Compact view for larger fleets."}
                   </div>
                 </div>
                 <button
@@ -6059,7 +6062,8 @@ export function RetroOffice3D({
                         onClick={() => {
                           setSpotlightAgentId(agent.id);
                           if (!isRemoteAgent) {
-                            onAgentEdit?.(agent.id);
+                            if (SAVANA_OFFICE_ENABLED) onAgentChatSelect?.(agent.id);
+                            else onAgentEdit?.(agent.id);
                           }
                           setAgentRosterOpen(false);
                         }}
@@ -6079,9 +6083,11 @@ export function RetroOffice3D({
                             {agent.name}
                           </div>
                           <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber-500/70">
-                            {isError ? "error" : working ? "working" : "idle"}
+                            {SAVANA_OFFICE_ENABLED
+                    ? isError ? "com problema" : working ? "em atividade" : "sem atividade"
+                    : isError ? "error" : working ? "working" : "idle"}
                             {isRemoteAgent ? " · remote" : ""}
-                            {runCount > 0 ? ` · ${runCount} runs` : ""}
+                            {runCount > 0 && !SAVANA_OFFICE_ENABLED ? ` · ${runCount} runs` : ""}
                           </div>
                         </div>
                       </button>
@@ -6089,8 +6095,8 @@ export function RetroOffice3D({
                         type="button"
                         title={
                           followAgentId === agent.id
-                            ? "Exit follow cam"
-                            : "Follow cam"
+                            ? SAVANA_OFFICE_ENABLED ? "Parar de seguir" : "Exit follow cam"
+                            : SAVANA_OFFICE_ENABLED ? "Seguir com a câmera" : "Follow cam"
                         }
                         onClick={() =>
                           setFollowAgentId((prev) =>
@@ -6111,8 +6117,8 @@ export function RetroOffice3D({
                           isRemoteAgent
                             ? "Remote office is view only"
                             : monitorAgentId === agent.id
-                              ? "Close desk monitor"
-                              : "Open desk monitor"
+                              ? SAVANA_OFFICE_ENABLED ? "Fechar monitor da mesa" : "Close desk monitor"
+                              : SAVANA_OFFICE_ENABLED ? "Abrir monitor da mesa" : "Open desk monitor"
                         }
                         disabled={isRemoteAgent}
                         onClick={() => {
@@ -6132,7 +6138,7 @@ export function RetroOffice3D({
                       >
                         <Monitor size={12} />
                       </button>
-                      {onAgentDelete && !isRemoteAgent ? (
+                      {onAgentDelete && !isRemoteAgent && !SAVANA_OFFICE_ENABLED ? (
                         <button
                           type="button"
                           title="Delete agent"
@@ -6185,7 +6191,9 @@ export function RetroOffice3D({
                     {hoveredAgent.name}
                   </div>
                   <div className="text-[10px] text-amber-600 uppercase tracking-widest">
-                    {hoveredAgent.item}
+                    {SAVANA_OFFICE_ENABLED
+                      ? (getAgentDefinition(hoveredAgent.id)?.role ?? hoveredAgent.item)
+                      : hoveredAgent.item}
                   </div>
                   {/* New Idea 8: last seen timestamp. */}
                   {(() => {
@@ -6195,7 +6203,7 @@ export function RetroOffice3D({
                     if (mins <= 0) return null;
                     return (
                       <div className="text-[9px] text-amber-700/70">
-                        last active {mins}m ago
+                        {SAVANA_OFFICE_ENABLED ? `ativo há ${mins} min` : `last active ${mins}m ago`}
                       </div>
                     );
                   })()}
@@ -6209,7 +6217,9 @@ export function RetroOffice3D({
                         : "bg-yellow-900/30 text-yellow-500 ring-1 ring-yellow-800/30"
                   }`}
                 >
-                  {isError ? "error" : working ? "working" : "idle"}
+                  {SAVANA_OFFICE_ENABLED
+                    ? isError ? "com problema" : working ? "em atividade" : "sem atividade"
+                    : isError ? "error" : working ? "working" : "idle"}
                 </div>
               </div>
             </div>
@@ -6994,7 +7004,7 @@ export function RetroOffice3D({
               <span>{remoteOfficeLabel}</span>
             </button>
           ) : null}
-          {onAddAgent ? (
+          {onAddAgent && !SAVANA_OFFICE_ENABLED ? (
             <button
               onClick={onAddAgent}
               title="Add agent"
@@ -7023,19 +7033,20 @@ export function RetroOffice3D({
           {/* New Idea 7: Heatmap toggle. */}
           <button
             onClick={() => setHeatmapMode((p) => !p)}
-            title="Toggle heatmap"
+            title={SAVANA_OFFICE_ENABLED ? "Mapa de calor (onde os agentes mais circulam)" : "Toggle heatmap"}
             className={`w-7 h-7 flex items-center justify-center rounded-md transition-all backdrop-blur-sm border ${heatmapMode ? "bg-amber-500/30 text-amber-300 border-amber-500/50" : "bg-[#122019]/80 text-amber-500/40 border-amber-900/20 hover:text-amber-400"}`}
           >
             <MapIcon size={12} />
           </button>
           <button
             onClick={() => setTrailMode((p) => !p)}
-            title="Toggle trails"
+            title={SAVANA_OFFICE_ENABLED ? "Mostrar rastro do movimento dos agentes" : "Toggle trails"}
             className={`w-7 h-7 flex items-center justify-center rounded-md transition-all backdrop-blur-sm border ${trailMode ? "bg-amber-500/30 text-amber-300 border-amber-500/50" : "bg-[#122019]/80 text-amber-500/40 border-amber-900/20 hover:text-amber-400"}`}
           >
             <Maximize size={12} />
           </button>
-          {/* Edit office toggle. */}
+          {/* Edit office toggle (hidden in Savana: the layout is fixed). */}
+          {!SAVANA_OFFICE_ENABLED ? (
           <button
             onClick={toggleEdit}
             title={editMode ? "Done editing" : "Edit office"}
@@ -7047,6 +7058,8 @@ export function RetroOffice3D({
               <Pencil size={12} strokeWidth={2} />
             )}
           </button>
+          ) : null}
+          {!SAVANA_OFFICE_ENABLED ? (
           <button
             onClick={() => setSettingsModalOpen(true)}
             title="Voice reply settings"
@@ -7054,6 +7067,7 @@ export function RetroOffice3D({
           >
             <Settings2 size={12} />
           </button>
+          ) : null}
           {editMode && (
             <>
               {drag.kind === "placing" && (
@@ -7202,15 +7216,18 @@ export function RetroOffice3D({
             {/* Ideas 6 + 8: Gateway status, agent counts, vibe score. */}
             <div className="flex items-center gap-3 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 text-[10px] font-mono">
               <span className="text-amber-500/60">
-                {agents.filter((a) => a.status === "working").length} working
+                {agents.filter((a) => a.status === "working").length}{" "}
+                {SAVANA_OFFICE_ENABLED ? "trabalhando" : "working"}
               </span>
               <span className="opacity-30">·</span>
               <span className="text-amber-500/60">
-                {agents.filter((a) => a.status === "idle").length} idle
+                {agents.filter((a) => a.status === "idle").length}{" "}
+                {SAVANA_OFFICE_ENABLED ? "sem atividade" : "idle"}
               </span>
               <span className="opacity-30">·</span>
               <span className="text-amber-500/60">
-                {agents.filter((a) => a.status === "error").length} error
+                {agents.filter((a) => a.status === "error").length}{" "}
+                {SAVANA_OFFICE_ENABLED ? "com problema" : "error"}
               </span>
               {/* New Idea 6: Vibe score with animated EQ bars. */}
               {(() => {
@@ -7218,8 +7235,9 @@ export function RetroOffice3D({
                   (a) => a.status === "working",
                 ).length;
                 const ratio = workingCount / Math.max(agents.length, 1);
-                const label =
-                  ratio < 0.2 ? "quiet" : ratio < 0.6 ? "active" : "buzzing";
+                const label = SAVANA_OFFICE_ENABLED
+                  ? ratio < 0.2 ? "calmo" : ratio < 0.6 ? "ativo" : "intenso"
+                  : ratio < 0.2 ? "quiet" : ratio < 0.6 ? "active" : "buzzing";
                 const animDur = ratio < 0.2 ? "1.8s" : ratio < 0.6 ? "1s" : "0.5s";
                 return (
                   <>
@@ -7247,14 +7265,16 @@ export function RetroOffice3D({
                 <>
                   <span className="opacity-30">·</span>
                   <span className="text-amber-400/40">
-                    drag · scroll · space+drag · dbl-click
+                    {SAVANA_OFFICE_ENABLED
+                      ? "arrastar: girar · rolar: zoom · espaço+arrastar: mover · duplo clique: focar"
+                      : "drag · scroll · space+drag · dbl-click"}
                   </span>
                 </>
               )}
               {spaceDown && (
                 <>
                   <span className="opacity-30">·</span>
-                  <span className="text-amber-300/80">pan mode</span>
+                  <span className="text-amber-300/80">{SAVANA_OFFICE_ENABLED ? "modo mover" : "pan mode"}</span>
                 </>
               )}
             </div>

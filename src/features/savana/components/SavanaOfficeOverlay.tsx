@@ -37,13 +37,20 @@ export function SavanaOfficeOverlay({
           <SavanaMark size={26} />
           <div className="min-w-0 flex-1 leading-tight">
             <div className="text-[12px] font-semibold tracking-[0.3em]">SAVANA</div>
-            <div className="text-[9px] uppercase tracking-[0.24em] text-savana-gold">Command Center</div>
+            <div className="whitespace-nowrap text-[9px] uppercase tracking-[0.2em] text-savana-gold">Command Center</div>
           </div>
           <Link
             href="/savana"
             className="rounded-lg border border-savana-gold/50 px-2.5 py-1.5 text-[11px] font-semibold text-savana-gold hover:bg-savana-gold/10"
           >
             Central →
+          </Link>
+          <Link
+            href="/savana/guia"
+            title="Como usar o Savana Command Center"
+            className="rounded-lg border border-savana-ivory/20 px-2 py-1.5 text-[11px] font-semibold text-savana-ivory/75 hover:text-savana-ivory"
+          >
+            ?
           </Link>
         </div>
         {error ? (
@@ -84,6 +91,11 @@ export function SavanaOfficeOverlay({
         ) : null}
       </div>
 
+      {!agent && data ? (
+        <p className="pointer-events-auto rounded-xl border border-savana-ivory/10 bg-savana-deep/85 px-3 py-2 text-[11px] leading-snug text-savana-ivory/65 backdrop-blur">
+          Clique em um agente (no escritório ou nas bolinhas do topo) para ver o status e pedir uma tarefa.
+        </p>
+      ) : null}
       {agent ? (
         <div className="pointer-events-auto rounded-2xl border border-savana-gold/30 bg-savana-deep/95 p-4 text-savana-ivory shadow-2xl backdrop-blur">
           <div className="flex items-start gap-3">
@@ -108,12 +120,20 @@ export function SavanaOfficeOverlay({
           <p className="mt-2 text-[11px] text-savana-ivory/45">
             {agent.area} · {agent.counts.ativas} abertas · {agent.counts.concluidas} concluídas
           </p>
-          <a
-            href={`/savana/agents/${agent.id}`}
-            className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-savana-gold px-3 py-2 text-xs font-semibold text-savana-graphite hover:bg-[#d6b77d]"
-          >
-            Abrir página do agente
-          </a>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Link
+              href={`/savana?nova=${agent.id}`}
+              className="inline-flex items-center justify-center rounded-lg bg-savana-gold px-3 py-2 text-xs font-semibold text-savana-graphite hover:bg-[#d6b77d]"
+            >
+              Pedir tarefa
+            </Link>
+            <Link
+              href={`/savana/agents/${agent.id}`}
+              className="inline-flex items-center justify-center rounded-lg border border-savana-gold/50 px-3 py-2 text-xs font-semibold text-savana-gold hover:bg-savana-gold/10"
+            >
+              Ver detalhes
+            </Link>
+          </div>
         </div>
       ) : null}
     </div>

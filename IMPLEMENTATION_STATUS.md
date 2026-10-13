@@ -20,6 +20,7 @@ Legenda: ✅ pronto e funcionando de verdade · 🎭 modo demonstração (simula
 | Página de tarefa | `/savana/tasks/[id]`: briefing, subtarefas, linha do tempo, notas, transições de status, aprovações, artefatos e execuções do runtime. |
 | Tempo real | WebSocket `/api/savana/ws` (proxy do Studio → backend). Central, páginas e escritório se atualizam sozinhos. |
 | Escritório 3D | Base Claw3D adaptada: título Savana, paleta (verde profundo, verde médio, dourado champanhe, off-white, grafite), estandarte Savana, cinco agentes com avatar executivo próprio, mesas, nome e função; clique no agente abre cartão com status real e link para a página. |
+| Português e ajuda | Interface Savana em português; no escritório 3D os textos visíveis foram traduzidos e os painéis do Claw3D fora do fluxo Savana ficam ocultos (Kanban próprio, Marketplace, Analytics, HQ, console de eventos, edição de layout, configurações de voz, chat sem modelo, assistente de conexão). Guia completo em `/savana/guia`; formulário de tarefa com ajuda em cada campo, modelo de briefing e exemplo por agente; "Pedir tarefa" direto do cartão do agente no 3D. |
 | Modo honesto | Banner de runtime em todas as telas e no 3D; chat do escritório responde com mensagem automática dizendo que não há modelo conectado. |
 | Segurança | Validação de entrada, limite de corpo (64 KB), exigência de `application/json` nas escritas, checagem de Origin no WebSocket, validação de caminhos relativos (sem `..`, absolutos, `~`, `.git`), links só http(s), mascaramento de segredos em logs/linha do tempo, lista de comandos proibidos para o futuro executor. Nenhum segredo no frontend. |
 | Testes | `npm run test:savana` — 17 testes: criação de tarefa, mudança de status, aprovação, runtime não configurado, Claude Code planejado, demonstração e segurança. |
@@ -70,7 +71,7 @@ Para os agentes não técnicos (NEXO, ATLAS, LUME, PULSO), o mesmo executor serv
 - Sem autenticação: uso apenas local (loopback).
 - O status "concluído/falhou" do agente volta a "disponível" 10 minutos após a última tarefa encerrada.
 - A mesa de cada agente no 3D é atribuída automaticamente pelo Claw3D; a "área" do agente é descritiva.
-- O escritório 3D herda painéis do Claw3D voltados ao OpenClaw (marketplace, analytics, gym, etc.); eles continuam lá, mas não fazem parte do fluxo Savana.
+- Os móveis interativos do escritório 3D (máquinas, telas, jukebox, academia) vêm do Claw3D, continuam em inglês e não fazem parte do fluxo Savana.
 - 5 testes de unidade do Claw3D já falhavam no commit original (`agentChatPanel-controls`, `agentFleetHydration`, `useGatewayConnection`); não foram alterados.
 - `npm run build` (produção) não foi validado neste ambiente: o layout baixa fontes do Google no build. O modo de desenvolvimento (`npm run savana`) foi testado.
 

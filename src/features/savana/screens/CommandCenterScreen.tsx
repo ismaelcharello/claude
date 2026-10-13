@@ -15,9 +15,10 @@ import { useLiveResource } from "../useSavanaData";
 
 type Filter = "abertas" | "todas" | TaskStatus;
 
-export function CommandCenterScreen() {
+export function CommandCenterScreen({ newTaskFor = null }: { newTaskFor?: AgentId | null }) {
   const { data, error, reload, realtime } = useLiveResource(savanaApi.overview);
-  const [creating, setCreating] = useState(false);
+  // Agent preselected in the "new task" dialog; null = dialog closed.
+  const [creating, setCreating] = useState<AgentId | null>(newTaskFor);
   const [filter, setFilter] = useState<Filter>("abertas");
   const [agentFilter, setAgentFilter] = useState<AgentId | "todos">("todos");
 
@@ -55,10 +56,32 @@ export function CommandCenterScreen() {
             Tarefas, fila, bloqueios e aprovações — tudo salvo localmente e atualizado em tempo real.
           </p>
         </div>
-        <Button variant="gold" onClick={() => setCreating(true)} disabled={!data}>
+        <Button variant="gold" onClick={() => setCreating("nexo")} disabled={!data}>
           + Nova tarefa
         </Button>
       </div>
+
+      {data && tasks.length === 0 ? (
+        <Panel title="Primeiros passos" className="mb-8">
+          <ol className="grid gap-4 text-sm text-savana-ivory/80 md:grid-cols-3">
+            <li>
+              <span className="block text-savana-gold">1. Escolha o agente</span>
+              Veja ao lado quem faz o quê. Na dúvida, peça ao NEXO, que organiza e distribui.
+            </li>
+            <li>
+              <span className="block text-savana-gold">2. Crie uma tarefa</span>
+              Clique em <strong>+ Nova tarefa</strong> e use <em>Preencher com exemplo</em> para ver um pedido bem escrito.
+            </li>
+            <li>
+              <span className="block text-savana-gold">3. Acompanhe e decida</span>
+              Acompanhe o status aqui e no escritório 3D. Ações sensíveis aparecem em <strong>Aprovações</strong> para você decidir.
+            </li>
+          </ol>
+          <Link href="/savana/guia" className="mt-4 inline-block text-xs font-semibold text-savana-gold hover:underline">
+            Ler o guia completo de uso →
+          </Link>
+        </Panel>
+      ) : null}
 
       <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-5">
         {kpis.map((kpi) => (
@@ -147,7 +170,7 @@ export function CommandCenterScreen() {
             ) : visible.length === 0 ? (
               <EmptyState>
                 Nenhuma tarefa aqui ainda.{" "}
-                <button className="text-savana-gold underline" onClick={() => setCreating(true)}>
+                <button className="text-savana-gold underline" onClick={() => setCreating("nexo")}>
                   Criar a primeira
                 </button>
               </EmptyState>
@@ -219,11 +242,13 @@ export function CommandCenterScreen() {
       </div>
 
       <CreateTaskDialog
-        open={creating}
-        onClose={() => setCreating(false)}
+        key={creating ?? "fechado"}
+        open={creating !== null}
+        defaultAgentId={creating ?? "nexo"}
+        onClose={() => setCreating(null)}
         projects={projects}
         onCreated={() => {
-          setCreating(false);
+          setCreating(null);
           void reload();
         }}
       />

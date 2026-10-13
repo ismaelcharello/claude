@@ -31,7 +31,9 @@ function OfficeLoadingFallback() {
 }
 
 export default function OfficePage() {
-  const showOpenClawConsole = readDebugFlag(process.env.DEBUG);
+  // The technical event console is hidden in the Savana office.
+  const showOpenClawConsole =
+    readDebugFlag(process.env.DEBUG) && process.env.NEXT_PUBLIC_SAVANA_OFFICE !== "1";
 
   return (
     <AgentStoreProvider>

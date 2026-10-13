@@ -19,6 +19,7 @@ Abra:
 
 - **Escritório 3D:** http://localhost:3000/office
 - **Central de Comando:** http://localhost:3000/savana
+- **Guia de uso (em português):** http://localhost:3000/savana/guia
 
 `npm run savana` sobe dois processos locais:
 
