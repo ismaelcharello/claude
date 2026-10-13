@@ -1,3 +1,81 @@
+# Savana Command Center
+
+**Escritório virtual 3D para coordenar os agentes de IA da Savana** — ecossistema de tecnologia, liderança e negócios.
+
+Este repositório é uma adaptação do [Claw3D](https://github.com/iamlukethedev/Claw3D), criado por **LukeTheDev** e distribuído sob a licença MIT (veja [`LICENSE`](LICENSE) e [`NOTICE.md`](NOTICE.md)). O escritório 3D, o proxy de gateway e a maior parte da interface imersiva vêm do Claw3D; a Savana adiciona a Central de Comando, o backend de tarefas e a camada de agentes.
+
+## Começar
+
+Requisitos: Node.js 20+ (22 recomendado) e npm 10+.
+
+```bash
+npm install
+npm run savana          # runtime não configurado (padrão: nada é executado)
+# ou
+npm run savana:demo     # modo demonstração (atividade simulada, banco separado)
+```
+
+Abra:
+
+- **Escritório 3D:** http://localhost:3000/office
+- **Central de Comando:** http://localhost:3000/savana
+
+`npm run savana` sobe dois processos locais:
+
+| Processo | Porta | Função |
+| --- | --- | --- |
+| Backend Savana (`savana/server`, Node + TypeScript) | 127.0.0.1:3100 | API REST, SQLite, WebSocket de tempo real, adaptador do escritório |
+| Studio Claw3D (`server/index.js` + Next.js) | localhost:3000 | Interface web; encaminha `/api/savana/*` para o backend |
+
+O navegador só fala com `localhost:3000`. Nenhum serviço externo é contatado.
+
+## Os cinco agentes
+
+| Agente | Papel | Missão |
+| --- | --- | --- |
+| **NEXO** | Orquestrador | Prioriza, delega, identifica dependências e bloqueios |
+| **ATLAS** | Estratégia e Produto | Ofertas, jornadas, planos e documentação |
+| **LUME** | Marca e Conteúdo | Branding, copy, campanhas, apresentações e conteúdo |
+| **PULSO** | Comercial e Comunidade | CRM, eventos, parcerias, follow-ups e experiência |
+| **FORJA** | Tecnologia | Código, testes, integrações e documentação técnica |
+
+Estados de agente: offline, disponível, preparando, trabalhando, bloqueado, aguardando aprovação, em revisão, concluído e falhou. O estado é **derivado das tarefas reais** e do runtime: sem runtime configurado, todos ficam *offline*.
+
+## Modos de runtime
+
+| Modo | Como ativar | O que acontece |
+| --- | --- | --- |
+| Runtime não configurado | `npm run savana` (padrão) | Tarefas, aprovações e histórico funcionam e persistem. Nenhum agente executa nada; a tarefa registra isso honestamente. |
+| Demonstração | `npm run savana:demo` | Um roteiro fixo move as tarefas pelos estados. Tudo é marcado **SIMULADO** e fica em `data/savana-demo.db`. |
+| Claude Code | `SAVANA_RUNTIME=claude-code` | Apenas arquitetura: registra o plano de execução (prompt, worktree, comando) e lista requisitos pendentes. Não executa nada nesta versão. |
+
+Detalhes, limites e o caminho para agentes reais: [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md).
+
+## Testes
+
+```bash
+npm run test:savana     # testes do Savana (criação, status, aprovação, runtime)
+npm test -- --run       # suíte completa (inclui testes do Claw3D)
+```
+
+## Estrutura adicionada pela Savana
+
+```
+savana/server/           backend Node + TypeScript (SQLite, API, WebSocket, runtimes)
+  runtime/               não configurado, demonstração, Claude Code (planejado), segurança
+src/lib/savana/          domínio compartilhado: agentes, estados, validação
+src/features/savana/     Central de Comando, páginas de agente e tarefa, overlay do 3D
+src/app/savana/          rotas /savana, /savana/agents/[id], /savana/tasks/[id]
+scripts/savana-start.mjs inicializador (backend + Studio)
+server/savana-ws-proxy.js proxy do WebSocket de tempo real
+```
+
+---
+
+# Projeto-base: Claw3D
+
+O conteúdo abaixo é o README original do Claw3D, mantido para referência.
+
 # Claw3D — A 3D Workspace for AI Agents
 
 <p align="center">
