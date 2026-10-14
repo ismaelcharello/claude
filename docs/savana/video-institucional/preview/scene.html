@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Savana institucional — motor de preview</title>
+<style>
+  html, body { margin: 0; background: #000; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+/*
+ * Motor de preview do filme institucional Savana (rascunho de direção).
+ * Desenho determinístico: drawFrame(t) só depende de t (segundos).
+ * Paleta PROPOSTA (não oficial) — recalibrar com extract_palette.py sobre a logo real.
+ * A logo NÃO está neste motor: o espaço dela é um marcador "LOGO PENDENTE".
+ */
+const W = 1920, H = 1080;
+const C = {
+  bgCenter: "#123527",
+  bgEdge: "#08190F",
+  line: "rgba(205,178,122,", // champanhe para linhas (alpha concatenado)
+  champ: "#CDB27A",
+  champLight: "#EAD9AE",
+  champDeep: "#8E7347",
+  offWhite: "#F3EEE3",
+  dim: "rgba(243,238,227,",
+};
+const SAFE = { x: 192, y: 108 }; // title safe 10%
+
+// ---------- utilidades ----------
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const E = {
+  outCubic: (k) => 1 - Math.pow(1 - k, 3),
+  outQuart: (k) => 1 - Math.pow(1 - k, 4),
+  inCubic: (k) => k * k * k,
+  inOutCubic: (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2),
+  inOutSine: (k) => -(Math.cos(Math.PI * k) - 1) / 2,
+};
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+}
+
+const cv = document.getElementById("c");
+const ctx = cv.getContext("2d");
+
+// ---------- grão (pré-calculado, deslocado por quadro) ----------
+const grain = document.createElement("canvas");
+grain.width = grain.height = 256;
+{
+  const g = grain.getContext("2d");
+  const img = g.createImageData(256, 256);
+  const r = rng(7);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 128 + (r() - 0.5) * 255;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 10;
+  }
+  g.putImageData(img, 0, 0);
+}
+
+// ---------- rede: pontos secundários ----------
+const ORIGIN = { x: 960, y: 330 };
+const HUBS = [
+  { x: 500, y: 690, idx: "01", word: "Tecnologia", at: 5.05 },
+  { x: 960, y: 760, idx: "02", word: "Liderança", at: 6.0 },
+  { x: 1420, y: 690, idx: "03", word: "Negócios", at: 6.9 },
+];
+const POINTS = [];
+{
+  const r = rng(42);
+  let guard = 0;
+  while (POINTS.length < 54 && guard++ < 5000) {
+    const p = { x: 80 + r() * (W - 160), y: 70 + r() * (H - 140), s: 1.2 + r() * 1.4 };
+    // reserva respiro em torno dos rótulos e da origem
+    const nearHub = HUBS.some((h) => Math.hypot(p.x - h.x, p.y - (h.y + 70)) < 170);
+    const nearO = Math.hypot(p.x - ORIGIN.x, p.y - ORIGIN.y) < 90;
+    const tooClose = POINTS.some((q) => Math.hypot(p.x - q.x, p.y - q.y) < 95);
+    if (!nearHub && !nearO && !tooClose) POINTS.push(p);
+  }
+  for (const p of POINTS) p.at = 3.75 + 0.0024 * Math.hypot(p.x - ORIGIN.x, p.y - ORIGIN.y);
+  // cada ponto se liga ao vizinho mais próximo que acendeu antes (árvore que cresce da origem)
+  for (const p of POINTS) {
+    let best = null, bd = 1e9;
+    for (const q of [ORIGIN, ...POINTS]) {
+      if (q === p) continue;
+      const qa = q === ORIGIN ? 3.8 : q.at;
+      if (qa >= p.at) continue;
+      const d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d < bd) { bd = d; best = q; }
+    }
+    p.parent = best;
+  }
+  // não deixar linhas secundárias atravessarem os rótulos dos pilares
+  const inLabel = (x, y) => HUBS.some((h) => Math.abs(x - h.x) < 200 && y > h.y + 18 && y < h.y + 150);
+  for (const p of POINTS) {
+    const q = p.parent;
+    p.hidden = false;
+    for (let i = 0; i <= 12; i++) {
+      if (inLabel(lerp(q.x, p.x, i / 12), lerp(q.y, p.y, i / 12))) { p.hidden = true; break; }
+    }
+  }
+}
+
+// ---------- primitivas ----------
+function background() {
+  const g = ctx.createRadialGradient(960, 470, 80, 960, 540, 1150);
+  g.addColorStop(0, C.bgCenter);
+  g.addColorStop(1, C.bgEdge);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+}
+function grainPass(t) {
+  const f = Math.floor(t * 30);
+  const r = rng(1000 + f);
+  ctx.save();
+  ctx.globalCompositeOperation = "overlay";
+  const ox = Math.floor(r() * 256), oy = Math.floor(r() * 256);
+  for (let x = -ox; x < W; x += 256) for (let y = -oy; y < H; y += 256) ctx.drawImage(grain, x, y);
+  ctx.restore();
+}
+function lightPoint(x, y, intensity) {
+  if (intensity <= 0) return;
+  const R = 64 * intensity;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, R);
+  g.addColorStop(0, `rgba(234,217,174,${0.42 * intensity})`);
+  g.addColorStop(0.25, `rgba(205,178,122,${0.16 * intensity})`);
+  g.addColorStop(1, "rgba(205,178,122,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = `rgba(247,238,214,${intensity})`;
+  ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill();
+}
+function segment(a, b, k, alpha, width = 1.2) {
+  if (k <= 0 || alpha <= 0) return;
+  ctx.strokeStyle = C.line + alpha + ")";
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(lerp(a.x, b.x, k), lerp(a.y, b.y, k));
+  ctx.stroke();
+}
+// texto com máscara de subida (revela por baixo de uma linha de corte)
+function maskedText(str, x, y, font, color, k, opts = {}) {
+  if (k <= 0) return;
+  const { align = "left", rise = 0.42, exitK = 0, tracking = 0 } = opts;
+  ctx.save();
+  ctx.font = font;
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  if (tracking) ctx.letterSpacing = tracking + "px";
+  const size = parseFloat(font.match(/(\d+)px/)[1]);
+  const m = ctx.measureText(str);
+  const left = align === "center" ? x - m.width / 2 : align === "right" ? x - m.width : x;
+  ctx.beginPath();
+  ctx.rect(left - 20, y - size * 1.05, m.width + 40, size * 1.4);
+  ctx.clip();
+  const e = E.outQuart(k);
+  const dy = (1 - e) * size * rise - E.inCubic(exitK) * size * 0.5;
+  ctx.globalAlpha = e * (1 - E.inCubic(exitK));
+  ctx.fillStyle = color;
+  ctx.fillText(str, x, y + dy);
+  ctx.restore();
+  return m.width;
+}
+function hubNode(h, k, t) {
+  if (k <= 0) return;
+  const e = E.outCubic(k);
+  ctx.save();
+  // pulso único de chegada
+  const pk = prog(t, h.at, h.at + 0.9);
+  if (pk > 0 && pk < 1) {
+    ctx.strokeStyle = `rgba(205,178,122,${0.5 * (1 - pk)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(h.x, h.y, 10 + 26 * E.outCubic(pk), 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.strokeStyle = `rgba(205,178,122,${0.9 * e})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(h.x, h.y, 10 * e, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = `rgba(243,238,227,${e})`;
+  ctx.beginPath(); ctx.arc(h.x, h.y, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+function pendingStamp(text) {
+  ctx.save();
+  ctx.font = '600 22px "Inter"';
+  ctx.letterSpacing = "2px";
+  const w = ctx.measureText(text).width + 36;
+  ctx.fillStyle = "rgba(170,40,40,0.92)";
+  ctx.fillRect(W - SAFE.x - w, 40, w, 40);
+  ctx.fillStyle = "#fff";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, W - SAFE.x - w + 18, 61);
+  ctx.restore();
+}
+
+// ---------- material champanhe (para a logo real, aplicado em CÓPIA) ----------
+// mask: canvas com alfa da logo. Retorna canvas tratado. Um único reflexo (sweep) controlado por k.
+function champagneMaterial(mask, sweepK) {
+  const w = mask.width, h = mask.height;
+  const out = document.createElement("canvas"); out.width = w; out.height = h + 8;
+  const o = out.getContext("2d");
+  const tint = (fill) => {
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const x = c.getContext("2d");
+    x.drawImage(mask, 0, 0);
+    x.globalCompositeOperation = "source-in";
+    x.fillStyle = fill; x.fillRect(0, 0, w, h);
+    return c;
+  };
+  // profundidade discreta: 4 camadas deslocadas 1px em tom profundo
+  const deep = tint(C.champDeep);
+  o.save(); o.shadowColor = "rgba(0,0,0,0.35)"; o.shadowBlur = 14; o.shadowOffsetY = 6;
+  for (let i = 4; i >= 1; i--) o.drawImage(deep, 0, i);
+  o.restore();
+  // face: gradiente vertical champanhe
+  const g = o.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "#E6D3A4"); g.addColorStop(0.48, C.champ); g.addColorStop(1, "#A88A55");
+  o.drawImage(tint(g), 0, 0);
+  // reflexo único: faixa diagonal estreita, mascarada pelo alfa
+  if (sweepK > 0 && sweepK < 1) {
+    const s = document.createElement("canvas"); s.width = w; s.height = h;
+    const x = s.getContext("2d");
+    const cx = lerp(-0.3 * w, 1.3 * w, E.inOutSine(sweepK));
+    const sg = x.createLinearGradient(cx - 120, 0, cx + 120, h * 0.5);
+    sg.addColorStop(0, "rgba(255,248,230,0)");
+    sg.addColorStop(0.5, "rgba(255,248,230,0.55)");
+    sg.addColorStop(1, "rgba(255,248,230,0)");
+    x.fillStyle = sg; x.fillRect(0, 0, w, h);
+    x.globalCompositeOperation = "destination-in";
+    x.drawImage(mask, 0, 0);
+    o.drawImage(s, 0, 0);
+  }
+  return out;
+}
+// amostra de material (forma neutra, NÃO é a logo)
+const sampleMask = document.createElement("canvas");
+sampleMask.width = 520; sampleMask.height = 150;
+{
+  const m = sampleMask.getContext("2d");
+  m.fillStyle = "#000";
+  m.beginPath(); m.roundRect(10, 20, 500, 110, 55); m.fill();
+  m.globalCompositeOperation = "destination-out";
+  m.beginPath(); m.roundRect(40, 50, 440, 50, 25); m.fill();
+}
+
+// ---------- cenas ----------
+function scene1and2(t) {
+  // câmera: aproximação lenta no gancho, recuo quando a rede se forma, avanço sutil no fim
+  let s = 1;
+  s += 0.025 * E.inOutSine(prog(t, 0, 3.6));
+  s -= 0.025 * E.inOutCubic(prog(t, 3.6, 5.0));
+  s += 0.035 * E.inOutSine(prog(t, 9.2, 10.4));
+  const fx = 960, fy = lerp(470, 700, E.inOutSine(prog(t, 9.2, 10.4)));
+  ctx.save();
+  ctx.setTransform(s, 0, 0, s, fx * (1 - s), fy * (1 - s));
+
+  // gancho
+  const hookFont1 = '300 96px "Inter Display"';
+  const hookFont2 = 'italic 300 96px "Inter Display"';
+  const exitK = prog(t, 3.5, 4.15);
+  const tx = SAFE.x + 48;
+  ctx.font = hookFont1;
+  const line1W = ctx.measureText("O futuro não se constrói").width;
+  if (t < 4.3) {
+    maskedText("O futuro não se constrói", tx, 480, hookFont1, C.offWhite, prog(t, 0.5, 1.45), { exitK });
+    maskedText("sozinho.", tx, 600, hookFont2, C.champ, prog(t, 1.05, 2.0), { exitK: prog(t, 3.42, 4.07) });
+  }
+
+  // ponto de luz: nasce à direita do gancho, migra para o centro superior (a Savana como conector)
+  const lx0 = Math.min(tx + line1W + 190, W - SAFE.x - 40), ly0 = 446;
+  const mk = E.inOutCubic(prog(t, 3.65, 4.9));
+  const L = { x: lerp(lx0, ORIGIN.x, mk), y: lerp(ly0, ORIGIN.y, mk) };
+  const breathe = 1 + 0.06 * Math.sin((t / 3) * Math.PI * 2);
+  let I = E.outCubic(prog(t, 0.15, 1.3)) * breathe;
+  I *= 1 + 0.25 * Math.sin(Math.PI * prog(t, 8.7, 9.8)); // acento em "ação"
+
+  // rede secundária
+  for (const p of POINTS) {
+    const k = E.outCubic(prog(t, p.at - 0.1, p.at + 0.45));
+    if (k <= 0) continue;
+    const a = p.parent === ORIGIN ? L : p.parent;
+    if (!p.hidden) segment(a, p, k, 0.13, 1);
+    ctx.fillStyle = C.dim + 0.38 * k + ")";
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, Math.PI * 2); ctx.fill();
+  }
+  // linhas principais origem → pilares
+  for (const h of HUBS) {
+    const k = E.inOutCubic(prog(t, h.at - 0.55, h.at));
+    segment(L, h, k, 0.75, 1.5);
+  }
+  // pilares conectados entre si: possibilidades → ação
+  segment(HUBS[0], HUBS[1], E.inOutCubic(prog(t, 7.9, 8.6)), 0.38, 1.1);
+  segment(HUBS[2], HUBS[1], E.inOutCubic(prog(t, 7.9, 8.6)), 0.38, 1.1);
+  segment(HUBS[0], HUBS[2], E.inOutCubic(prog(t, 8.4, 9.3)), 0.28, 1.1);
+
+  for (const h of HUBS) {
+    const k = prog(t, h.at, h.at + 0.5);
+    hubNode(h, k, t);
+    maskedText(h.idx, h.x, h.y + 58, '500 28px "Inter"', C.champ, prog(t, h.at + 0.05, h.at + 0.7), { align: "center", tracking: 4 });
+    maskedText(h.word, h.x, h.y + 128, '400 62px "Inter Display"', C.offWhite, prog(t, h.at + 0.12, h.at + 0.85), { align: "center" });
+  }
+  lightPoint(L.x, L.y, I);
+  ctx.restore();
+}
+
+function drawFrame(t, opts = {}) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  background();
+  if (t < 10.5) scene1and2(t);
+  if (opts.materialSample) {
+    const k = opts.materialSample;
+    const img = champagneMaterial(sampleMask, k);
+    ctx.drawImage(img, 960 - img.width / 2, 470 - img.height / 2);
+    ctx.font = '500 28px "Inter"'; ctx.textAlign = "center"; ctx.fillStyle = C.dim + "0.7)";
+    ctx.fillText("Amostra de material champanhe — forma neutra, não é a logo", 960, 700);
+    ctx.textAlign = "left";
+  }
+  if (opts.guides) guides();
+  grainPass(t);
+  if (opts.stamp) pendingStamp(opts.stamp);
+}
+function guides() {
+  ctx.save();
+  ctx.setLineDash([8, 8]);
+  ctx.strokeStyle = "rgba(255,80,80,0.6)"; ctx.lineWidth = 1;
+  ctx.strokeRect(SAFE.x, SAFE.y, W - 2 * SAFE.x, H - 2 * SAFE.y);         // title safe 10%
+  ctx.strokeStyle = "rgba(80,160,255,0.6)";
+  ctx.strokeRect(96, 54, W - 192, H - 108);                               // action safe 5%
+  ctx.restore();
+}
+
+window.ready = (async () => {
+  await Promise.all([
+    document.fonts.load('300 96px "Inter Display"'),
+    document.fonts.load('italic 300 96px "Inter Display"'),
+    document.fonts.load('400 62px "Inter Display"'),
+    document.fonts.load('500 28px "Inter"'),
+    document.fonts.load('600 22px "Inter"'),
+  ]);
+  return true;
+})();
+window.drawFrame = drawFrame;
+</script>
+</body>
+</html>
