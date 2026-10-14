@@ -13,6 +13,8 @@ export interface AgentRuntime {
   /** Real runtimes only: start / cancel an execution on human request. */
   startRun?(taskId: string): Run;
   cancelRun?(taskId: string): void;
+  /** FORJA only: request approval to push the task branch. */
+  requestPush?(taskId: string): Approval;
   dispose(): void;
 }
 

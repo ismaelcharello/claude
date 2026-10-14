@@ -137,6 +137,8 @@ const mapRun = (r: Row): Run => ({
   createdAt: String(r.created_at),
   startedAt: (r.started_at as string | null) ?? null,
   finishedAt: (r.finished_at as string | null) ?? null,
+  commitSha: (r.commit_sha as string | null) ?? null,
+  pushedAt: (r.pushed_at as string | null) ?? null,
 });
 
 export type MutationContext = {
@@ -659,8 +661,8 @@ export class SavanaService extends EventEmitter {
     return this.insertTimeline(taskId, "runtime", message, ctx);
   }
 
-  recordRun(run: Omit<Run, "id" | "createdAt">): Run {
-    const full: Run = { ...run, id: randomUUID(), createdAt: this.now() };
+  recordRun(run: Omit<Run, "id" | "createdAt" | "commitSha" | "pushedAt">): Run {
+    const full: Run = { ...run, id: randomUUID(), createdAt: this.now(), commitSha: null, pushedAt: null };
     this.db
       .prepare(
         `INSERT INTO runs (id, task_id, agent_id, runtime, status, prompt, worktree_path, branch, command_json,
@@ -700,14 +702,16 @@ export class SavanaService extends EventEmitter {
 
   updateRun(
     id: string,
-    patch: Partial<Pick<Run, "status" | "filesChanged" | "resultSummary" | "exitCode" | "startedAt" | "finishedAt">>
+    patch: Partial<
+      Pick<Run, "status" | "filesChanged" | "resultSummary" | "exitCode" | "startedAt" | "finishedAt" | "commitSha" | "pushedAt">
+    >
   ): Run {
     const current = this.getRun(id);
     const next: Run = { ...current, ...patch };
     this.db
       .prepare(
         `UPDATE runs SET status = ?, files_changed_json = ?, result_summary = ?, exit_code = ?, started_at = ?,
-         finished_at = ? WHERE id = ?`
+         finished_at = ?, commit_sha = ?, pushed_at = ? WHERE id = ?`
       )
       .run(
         next.status,
@@ -716,6 +720,8 @@ export class SavanaService extends EventEmitter {
         next.exitCode,
         next.startedAt,
         next.finishedAt,
+        next.commitSha,
+        next.pushedAt,
         id
       );
     const updated = this.getRun(id);

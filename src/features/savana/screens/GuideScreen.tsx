@@ -329,7 +329,7 @@ export function GuideScreen() {
             </ol>
             <p className="text-sm text-savana-ivory/65">
               <B>Segurança:</B> cada tarefa roda numa pasta própria (<code>data/workspaces/</code>), com permissão só para
-              ler e escrever arquivos ali. O agente não tem terminal nem internet e não consegue publicar, enviar mensagens,
+              ler e escrever arquivos ali (o FORJA tem regras próprias, abaixo). O agente não tem terminal nem internet e não consegue publicar, enviar mensagens,
               fazer commit ou usar senhas; se achar que algo precisa disso, ele lista em &quot;Ações que precisam de
               aprovação&quot; no resultado. Você pode <B>cancelar</B> a qualquer momento, e há um tempo-limite de 10 minutos.
             </p>
@@ -337,9 +337,35 @@ export function GuideScreen() {
               <B>Custo:</B> cada execução usa a sua conta do Claude (assinatura ou créditos). O custo informado aparece no
               resumo da execução quando disponível.
             </p>
+            <p className="pt-2 font-semibold text-savana-gold">FORJA (código): passos extras</p>
+            <ol className="space-y-3">
+              <Step n={1}>
+                Escolha em qual projeto o FORJA vai trabalhar (uma pasta com Git, por exemplo o site da Savana).
+              </Step>
+              <Step n={2}>
+                Abra o arquivo <code>.env</code> da Savana (na pasta do projeto) e adicione uma linha com o caminho completo:{" "}
+                <code className="rounded bg-black/30 px-1.5 py-0.5 text-savana-gold">SAVANA_REPO_ROOT=/Users/seu-usuario/projeto</code>
+              </Step>
+              <Step n={3}>
+                Reinicie: feche o Terminal com <B>Ctrl + C</B> e rode de novo{" "}
+                <code className="rounded bg-black/30 px-1.5 py-0.5 text-savana-gold">npm run savana:ia</code>.
+              </Step>
+              <Step n={4}>
+                Crie a tarefa para o FORJA e clique em <B>Executar com IA</B>. Ele trabalha numa <B>cópia isolada</B> do projeto
+                (pasta <code>~/savana-worktrees</code>, branch <code>savana/forja/…</code>). O seu código principal não é tocado.
+              </Step>
+              <Step n={5}>
+                Ao terminar, aparece em <B>Artefatos</B> o diff (o que mudou) e um pedido de <B>aprovação de commit</B>. Leia o
+                diff e aprove ou rejeite com o motivo.
+              </Step>
+              <Step n={6}>
+                Depois do commit, se quiser enviar ao GitHub, clique em <B>Solicitar push para o GitHub</B> e aprove. Só a branch
+                do FORJA é enviada; juntar com a principal (pull request) continua sendo decisão sua.
+              </Step>
+            </ol>
             <p className="text-sm text-savana-ivory/65">
-              <B>Ainda não:</B> o FORJA (código) só vai executar quando tivermos a pasta Git isolada e a aprovação de
-              commit/push funcionando.
+              O FORJA pode editar arquivos e rodar testes, lint e consultas do Git. Ele <B>não</B> pode fazer commit, push,
+              apagar arquivos, instalar pacotes ou acessar a internet.
             </p>
           </Section>
 

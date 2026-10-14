@@ -86,6 +86,7 @@ export function TaskScreen({ taskId }: { taskId: string }) {
 
   const task = data?.task;
   const activeRun = data?.runs.find((r) => r.status === "executando") ?? null;
+  const codeRun = data?.runs.find((r) => r.branch) ?? null;
   const agent = task ? getAgentDefinition(task.agentId) : undefined;
   const pendingApproval = data?.approvals.some((a) => a.status === "pendente") ?? false;
   const nextStatuses = task
@@ -205,7 +206,13 @@ export function TaskScreen({ taskId }: { taskId: string }) {
                           <span className="text-savana-ivory/50">{r.runtime}</span>
                           <span className="ml-auto text-savana-ivory/40">{formatDateTime(r.createdAt)}</span>
                         </div>
-                        {r.branch ? <p className="mt-2 text-xs text-savana-ivory/60">Branch {r.branch} · Worktree {r.worktreePath}</p> : null}
+                        {r.branch ? (
+                          <p className="mt-2 break-all text-xs text-savana-ivory/60">
+                            Branch {r.branch} · Cópia isolada: {r.worktreePath}
+                            {r.commitSha ? ` · Commit ${r.commitSha.slice(0, 8)}` : ""}
+                            {r.pushedAt ? " · enviado" : ""}
+                          </p>
+                        ) : null}
                         {!r.branch && r.worktreePath ? <p className="mt-2 break-all text-xs text-savana-ivory/50">Pasta: {r.worktreePath}</p> : null}
                         {r.filesChanged.length > 0 ? <p className="mt-1 text-xs text-savana-ivory/60">Arquivos: {r.filesChanged.join(", ")}</p> : null}
                         {r.resultSummary ? <p className="mt-1 text-xs text-savana-ivory/70">{r.resultSummary}</p> : null}
@@ -240,16 +247,27 @@ export function TaskScreen({ taskId }: { taskId: string }) {
                     </p>
                   ) : !runtime.runnableAgents?.includes(task.agentId) ? (
                     <p className="text-sm text-savana-ivory/65">
-                      {agent?.name} ainda não executa com IA nesta versão. Tarefas de código precisam de pasta Git isolada e
-                      aprovação de commit/push, que serão a próxima etapa.
+                      {agent?.name} precisa saber em qual projeto trabalhar. No arquivo <code>.env</code> da Savana, adicione{" "}
+                      <code className="text-savana-gold">SAVANA_REPO_ROOT=/caminho/do/projeto</code> (uma pasta com Git) e
+                      reinicie com <code className="text-savana-gold">npm run savana:ia</code>. Passo a passo no guia, seção
+                      &quot;Ligar a IA&quot;.
                     </p>
                   ) : (
                     <div className="space-y-3">
-                      <p className="text-sm text-savana-ivory/75">
-                        {agent?.name} vai ler o briefing e escrever a entrega em uma pasta isolada desta tarefa. Ele não tem
-                        terminal nem internet e não pode publicar, enviar mensagens ou usar senhas. O resultado volta como
-                        &quot;Em revisão&quot; para você conferir. <strong>Cada execução consome sua conta do Claude.</strong>
-                      </p>
+                      {task.agentId === "forja" ? (
+                        <p className="text-sm text-savana-ivory/75">
+                          FORJA vai trabalhar numa <strong>cópia isolada do projeto</strong> (branch própria), podendo editar
+                          arquivos e rodar testes. Ele <strong>não</strong> pode fazer commit, push, apagar arquivos ou usar a
+                          internet. Ao terminar, você vê o diff e decide se aprova o commit. Enviar ao GitHub é outra
+                          aprovação. <strong>Cada execução consome sua conta do Claude.</strong>
+                        </p>
+                      ) : (
+                        <p className="text-sm text-savana-ivory/75">
+                          {agent?.name} vai ler o briefing e escrever a entrega em uma pasta isolada desta tarefa. Ele não tem
+                          terminal nem internet e não pode publicar, enviar mensagens ou usar senhas. O resultado volta como
+                          &quot;Em revisão&quot; para você conferir. <strong>Cada execução consome sua conta do Claude.</strong>
+                        </p>
+                      )}
                       <Button
                         variant="gold"
                         disabled={!["na_fila", "bloqueado", "falhou"].includes(task.status)}
@@ -264,6 +282,27 @@ export function TaskScreen({ taskId }: { taskId: string }) {
                       </Button>
                     </div>
                   )}
+                  {codeRun?.commitSha ? (
+                    <div className="mt-4 rounded-lg border border-savana-ivory/10 bg-savana-graphite/50 p-3 text-xs text-savana-ivory/75">
+                      <p>
+                        Commit <code className="text-savana-gold">{codeRun.commitSha.slice(0, 8)}</code> na branch{" "}
+                        <code className="text-savana-gold">{codeRun.branch}</code>
+                        {codeRun.pushedAt ? " · enviado ao GitHub" : " · somente no seu computador"}
+                      </p>
+                      {!codeRun.pushedAt ? (
+                        <Button
+                          className="mt-2"
+                          disabled={data.approvals.some((a) => a.action === "push" && a.status === "pendente")}
+                          title="Cria um pedido de aprovação para enviar esta branch ao GitHub"
+                          onClick={() => void run(() => savanaApi.requestPush(taskId))}
+                        >
+                          {data.approvals.some((a) => a.action === "push" && a.status === "pendente")
+                            ? "Push aguardando sua aprovação"
+                            : "Solicitar push para o GitHub"}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {data.logs.length > 0 ? (
                     <details className="mt-4" open={Boolean(activeRun)}>
                       <summary className="cursor-pointer text-xs text-savana-gold">Log da execução ({data.logs.length})</summary>
@@ -361,7 +400,13 @@ export function TaskScreen({ taskId }: { taskId: string }) {
                           {a.content}
                         </a>
                       ) : (
-                        <p className="mt-1 whitespace-pre-wrap break-words text-xs text-savana-ivory/65">{a.content}</p>
+                        a.kind === "diff" ? (
+                          <pre className="mt-1 max-h-80 overflow-auto rounded-lg bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-savana-ivory/75">
+                            {a.content}
+                          </pre>
+                        ) : (
+                          <p className="mt-1 whitespace-pre-wrap break-words text-xs text-savana-ivory/65">{a.content}</p>
+                        )
                       )}
                     </li>
                   ))}

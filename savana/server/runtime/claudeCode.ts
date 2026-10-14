@@ -2,9 +2,10 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { getAgentDefinition } from "../../../src/lib/savana/agents";
-import type { AgentId, Run, RuntimeInfo, RuntimeRequirement, Task } from "../../../src/lib/savana/types";
+import type { AgentId, Approval, Run, RuntimeInfo, RuntimeRequirement, Task } from "../../../src/lib/savana/types";
 import type { SavanaConfig } from "../config";
 import { SavanaError, type MutationContext, type SavanaService } from "../service";
+import { commitStaged, ensureWorktree, gitErrorMessage, isGitRepo, pushBranch, stageAndDiff } from "./git";
 import { redactSecrets, resolveInside } from "./safety";
 import type { AgentRuntime } from "./types";
 
@@ -31,7 +32,7 @@ export const findOnPath = (binary: string, envPath = process.env.PATH ?? ""): st
   return null;
 };
 
-/** Agents that may run in this version. FORJA (code) waits for the worktree + approval flow. */
+/** Document agents: always runnable once Claude Code is ready. FORJA also needs a git repository. */
 export const RUNNABLE_AGENTS: AgentId[] = ["nexo", "atlas", "lume", "pulso"];
 
 /** Tools the agent may use: files inside its own task folder only. */
@@ -39,15 +40,46 @@ export const ALLOWED_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep"];
 /** Never available: shell (git, network, messages), web, sub-agents. */
 export const DISALLOWED_TOOLS = ["Bash", "WebFetch", "WebSearch", "Task", "NotebookEdit"];
 
+/**
+ * FORJA: file tools plus only test / lint / read-only git commands. Anything
+ * else (commit, push, rm, network, package installs) is denied: in
+ * non-interactive mode, commands not listed here cannot run.
+ */
+export const FORJA_ALLOWED_TOOLS = [
+  ...ALLOWED_TOOLS,
+  "Bash(npm test:*)",
+  "Bash(npm run test:*)",
+  "Bash(npm run lint:*)",
+  "Bash(npm run typecheck:*)",
+  "Bash(npx vitest:*)",
+  "Bash(npx tsc:*)",
+  "Bash(git status:*)",
+  "Bash(git diff:*)",
+  "Bash(git log:*)",
+  "Bash(ls:*)",
+];
+export const FORJA_DISALLOWED_TOOLS = [
+  "Bash(git commit:*)",
+  "Bash(git push:*)",
+  "Bash(git reset:*)",
+  "Bash(git checkout:*)",
+  "Bash(rm:*)",
+  "Bash(curl:*)",
+  "Bash(npm install:*)",
+  "WebFetch",
+  "WebSearch",
+  "Task",
+  "NotebookEdit",
+];
+
 export const RESULT_FILE = "resultado.md";
 export const BRIEFING_FILE = "BRIEFING.md";
 
 export const describeClaudeCodeRequirements = (config: SavanaConfig): RuntimeRequirement[] => {
   const cli = findOnPath(config.claudeBin);
-  const repoIsGit = Boolean(config.repoRoot && fs.existsSync(path.join(config.repoRoot, ".git")));
+  const repoIsGit = Boolean(config.repoRoot && isGitRepo(config.repoRoot));
   const worktreeOutsideRepo = Boolean(
-    config.worktreeRoot &&
-      config.repoRoot &&
+    config.repoRoot &&
       config.worktreeRoot !== config.repoRoot &&
       !config.worktreeRoot.startsWith(config.repoRoot + path.sep)
   );
@@ -72,9 +104,15 @@ export const describeClaudeCodeRequirements = (config: SavanaConfig): RuntimeReq
     },
     {
       id: "forja",
-      label: "FORJA (código) com worktree Git isolada — ainda não habilitado nesta versão",
-      ok: repoIsGit && worktreeOutsideRepo && false,
-      hint: "Opcional por enquanto. Exigirá SAVANA_REPO_ROOT e SAVANA_WORKTREE_ROOT e aprovação para commit/push.",
+      label: config.repoRoot
+        ? `FORJA (código): repositório ${config.repoRoot}`
+        : "FORJA (código): repositório Git definido em SAVANA_REPO_ROOT",
+      ok: repoIsGit && worktreeOutsideRepo,
+      hint: !config.repoRoot
+        ? "Opcional, só para o FORJA. No arquivo .env, adicione SAVANA_REPO_ROOT=/caminho/do/projeto (um repositório Git) e reinicie."
+        : !repoIsGit
+          ? "SAVANA_REPO_ROOT não aponta para um repositório Git."
+          : "SAVANA_WORKTREE_ROOT precisa ficar fora do repositório.",
     },
   ];
 };
@@ -96,7 +134,7 @@ export const planWorktree = (config: SavanaConfig, task: Pick<Task, "id" | "agen
 };
 
 /** Builds the prompt a Claude Code agent receives. Stored with the run for auditability. */
-export const buildAgentPrompt = (task: Task): string => {
+export const buildAgentPrompt = (task: Task, code?: { branch: string }): string => {
   const agent = getAgentDefinition(task.agentId);
   const allowed = agent?.permissions.filter((p) => p.level === "livre").map((p) => `- ${p.label}`) ?? [];
   const gated = agent?.permissions.filter((p) => p.level === "aprovacao").map((p) => `- ${p.label}`) ?? [];
@@ -117,7 +155,14 @@ export const buildAgentPrompt = (task: Task): string => {
     ...denied,
     "",
     "Regras desta execução:",
-    "- Trabalhe somente com arquivos desta pasta. Você não tem terminal, internet nem acesso a outros sistemas.",
+    ...(code
+      ? [
+          `- Você está numa cópia isolada (git worktree) do repositório, na branch ${code.branch}. Altere o código só aqui.`,
+          "- Você pode rodar testes, lint, typecheck e git status/diff/log. Não pode fazer commit, push, apagar arquivos com rm, instalar pacotes nem acessar a internet.",
+          "- Ao terminar, NÃO faça commit: o sistema vai mostrar o diff e pedir aprovação humana para o commit.",
+          `- No ${RESULT_FILE}, liste também: arquivos alterados, testes executados e o resultado deles, e riscos.`,
+        ]
+      : ["- Trabalhe somente com arquivos desta pasta. Você não tem terminal, internet nem acesso a outros sistemas."]),
     "- Não invente fatos, números, depoimentos ou datas. Marque como [PENDENTE] o que precisar de confirmação.",
     `- Escreva a entrega final em português no arquivo ${RESULT_FILE}, com as seções:`,
     "  ## Resumo · ## Entrega · ## Pendências e dúvidas · ## Ações que precisam de aprovação (se houver)",
@@ -169,13 +214,14 @@ export class ClaudeCodeRuntime implements AgentRuntime {
   info(): RuntimeInfo {
     const requirements = describeClaudeCodeRequirements(this.config);
     const ready = requirements.filter((r) => r.id === "cli" || r.id === "enabled").every((r) => r.ok);
+    const forjaReady = requirements.find((r) => r.id === "forja")?.ok ?? false;
     return {
       mode: "claude_code",
       label: ready ? "Claude Code conectado" : "Claude Code (requisitos pendentes)",
       canExecute: ready,
       simulated: false,
       supportsManualRun: true,
-      runnableAgents: RUNNABLE_AGENTS,
+      runnableAgents: forjaReady ? [...RUNNABLE_AGENTS, "forja"] : RUNNABLE_AGENTS,
       summary: ready
         ? "IA real conectada. Cada tarefa só é executada quando você clica em 'Executar com IA' na página dela; " +
           "o agente trabalha numa pasta isolada, sem terminal nem internet, e o resultado volta para sua revisão. " +
@@ -183,19 +229,95 @@ export class ClaudeCodeRuntime implements AgentRuntime {
         : "Modo Claude Code selecionado, mas faltam requisitos (veja abaixo). Nenhuma execução é possível até resolvê-los.",
       requirements,
       nextSteps: ready
-        ? ["Abra uma tarefa de NEXO, ATLAS, LUME ou PULSO e clique em 'Executar com IA'. Comece por um teste simples."]
+        ? [
+            "Abra uma tarefa e clique em 'Executar com IA'. Comece por um teste simples.",
+            ...(forjaReady ? [] : requirements.filter((r) => r.id === "forja").map((r) => r.hint)),
+          ]
         : requirements.filter((r) => !r.ok && r.id !== "forja").map((r) => r.hint),
     };
   }
 
   onTaskCreated(task: Task): void {
-    const message = RUNNABLE_AGENTS.includes(task.agentId)
+    const runnable = this.info().runnableAgents ?? [];
+    const message = runnable.includes(task.agentId)
       ? "Pronta para execução com Claude Code. Nada roda sozinho: abra a tarefa e clique em 'Executar com IA' quando quiser."
-      : "FORJA (código) ainda não executa com IA nesta versão: requer worktree isolada e aprovação de commit/push.";
+      : "FORJA precisa de um repositório configurado (SAVANA_REPO_ROOT) para executar. Veja 'Como ativar agentes reais'.";
     this.service.addRuntimeNote(task.id, message, SYSTEM);
   }
 
-  onApprovalResolved(): void {}
+  onApprovalResolved(approval: Approval): void {
+    if (approval.agentId !== "forja" || approval.status !== "aprovada") return;
+    const run = this.service.getTaskDetail(approval.taskId).runs.find((r) => r.branch && r.worktreePath);
+    if (!run || !run.worktreePath || !run.branch) return;
+    const log = (message: string, level: "info" | "aviso" | "erro" = "info") =>
+      this.service.addLog("forja", message, AGENT, { taskId: approval.taskId, level });
+    if (approval.action === "commit") {
+      try {
+        const task = this.service.getTask(approval.taskId);
+        stageAndDiff(run.worktreePath);
+        const sha = commitStaged(run.worktreePath, `savana(forja): ${task.title}`);
+        this.service.updateRun(run.id, { commitSha: sha });
+        log(`Commit ${sha.slice(0, 8)} criado na branch ${run.branch} (aprovado por você).`);
+        this.service.addRuntimeNote(
+          approval.taskId,
+          `Commit ${sha.slice(0, 8)} criado na branch ${run.branch}, somente no seu computador. ` +
+            "Nada foi enviado ao GitHub; para enviar, use 'Solicitar push'.",
+          SYSTEM
+        );
+        this.safeTransition(approval.taskId, "em_revisao", { note: "Commit criado; revise o código" });
+      } catch (error) {
+        const message = gitErrorMessage(error);
+        log(`Commit falhou: ${message}`, "erro");
+        this.safeTransition(approval.taskId, "falhou", { note: `Commit falhou: ${message.slice(0, 200)}` });
+      }
+      return;
+    }
+    if (approval.action === "push") {
+      try {
+        pushBranch(run.worktreePath, run.branch);
+        this.service.updateRun(run.id, { pushedAt: new Date().toISOString() });
+        log(`Branch ${run.branch} enviada ao GitHub (aprovado por você).`);
+        this.service.addRuntimeNote(approval.taskId, `Branch ${run.branch} enviada para o repositório remoto (origin).`, SYSTEM);
+      } catch (error) {
+        const message = gitErrorMessage(error);
+        log(`Push falhou: ${message}`, "erro");
+        this.service.addRuntimeNote(approval.taskId, `Push falhou: ${message}`, SYSTEM);
+      }
+    }
+  }
+
+  /** FORJA: asks for a separate approval to push the task branch. */
+  requestPush(taskId: string): Approval {
+    const task = this.service.getTask(taskId);
+    const detail = this.service.getTaskDetail(taskId);
+    const run = detail.runs.find((r) => r.branch && r.commitSha);
+    if (task.agentId !== "forja" || !run || !run.branch) {
+      throw new SavanaError("Não há commit do FORJA para enviar nesta tarefa.", 409, "nothing_to_push");
+    }
+    if (run.pushedAt) throw new SavanaError("Esta branch já foi enviada.", 409, "already_pushed");
+    if (detail.approvals.some((a) => a.action === "push" && a.status === "pendente")) {
+      throw new SavanaError("Já existe um pedido de push aguardando sua decisão.", 409, "push_pending");
+    }
+    return this.service.requestApproval(
+      {
+        taskId,
+        action: "push",
+        summary: `Enviar a branch ${run.branch} para o GitHub (origin)`,
+        details:
+          `Commit ${run.commitSha?.slice(0, 8)}. Envia somente esta branch, usando as credenciais Git do seu computador. ` +
+          "Nada é enviado para a branch principal; o merge continua sendo decisão sua (pull request).",
+      },
+      { actor: "humano" }
+    );
+  }
+
+  private safeTransition(taskId: string, to: Task["status"], options: { note?: string; blockedReason?: string }) {
+    try {
+      this.service.transitionTask(taskId, to, AGENT, options);
+    } catch (error) {
+      this.service.addRuntimeNote(taskId, `Status não alterado automaticamente: ${error instanceof Error ? error.message : error}`, SYSTEM);
+    }
+  }
 
   isRunning(taskId: string): boolean {
     return this.active.has(taskId);
@@ -206,8 +328,13 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     const info = this.info();
     if (!info.canExecute) throw new SavanaError("Claude Code não está pronto: " + info.nextSteps.join(" "), 409, "runtime_unavailable");
     let task = this.service.getTask(taskId);
-    if (!RUNNABLE_AGENTS.includes(task.agentId)) {
-      throw new SavanaError("FORJA ainda não executa com IA nesta versão (código exige worktree e aprovação).", 409, "agent_not_runnable");
+    const isCode = task.agentId === "forja";
+    if (!(info.runnableAgents ?? []).includes(task.agentId)) {
+      throw new SavanaError(
+        "FORJA precisa de um repositório Git configurado (SAVANA_REPO_ROOT no .env) para executar.",
+        409,
+        "agent_not_runnable"
+      );
     }
     if (this.active.has(taskId) || this.service.getTaskDetail(taskId).runs.some((r) => r.status === "executando")) {
       throw new SavanaError("Esta tarefa já está em execução.", 409, "already_running");
@@ -216,9 +343,23 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       throw new SavanaError("Só é possível executar tarefas na fila, bloqueadas ou que falharam.", 409, "not_startable");
     }
 
-    const workspace = resolveInside(this.config.workspacesDir, task.id);
-    if (!workspace) throw new SavanaError("Pasta de trabalho inválida.", 500, "bad_workspace");
-    fs.mkdirSync(workspace, { recursive: true });
+    let workspace: string | null;
+    let branch: string | null = null;
+    if (isCode) {
+      const plan = planWorktree(this.config, task);
+      if (!plan) throw new SavanaError("Não foi possível planejar a worktree do FORJA.", 500, "bad_worktree");
+      try {
+        ensureWorktree(this.config.repoRoot!, plan.worktreePath, plan.branch);
+      } catch (error) {
+        throw new SavanaError(`Não foi possível criar a cópia isolada (worktree): ${gitErrorMessage(error)}`, 500, "worktree_failed");
+      }
+      workspace = plan.worktreePath;
+      branch = plan.branch;
+    } else {
+      workspace = resolveInside(this.config.workspacesDir, task.id);
+      if (!workspace) throw new SavanaError("Pasta de trabalho inválida.", 500, "bad_workspace");
+      fs.mkdirSync(workspace, { recursive: true });
+    }
     fs.rmSync(path.join(workspace, RESULT_FILE), { force: true });
     fs.writeFileSync(
       path.join(workspace, BRIEFING_FILE),
@@ -229,15 +370,17 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     if (task.status === "falhou") task = this.service.transitionTask(taskId, "na_fila", SYSTEM, { note: "Nova execução" });
     this.service.transitionTask(taskId, "preparando", AGENT, { note: "Execução com Claude Code iniciada por você" });
 
-    const prompt = buildAgentPrompt(task);
+    const prompt = buildAgentPrompt(task, branch ? { branch } : undefined);
+    const allowed = isCode ? FORJA_ALLOWED_TOOLS : ALLOWED_TOOLS;
+    const disallowed = isCode ? FORJA_DISALLOWED_TOOLS : DISALLOWED_TOOLS;
     const args = [
       "-p", prompt,
       "--output-format", "stream-json",
       "--verbose",
       "--max-turns", String(this.config.maxTurns),
       "--permission-mode", "acceptEdits",
-      "--allowedTools", ALLOWED_TOOLS.join(","),
-      "--disallowedTools", DISALLOWED_TOOLS.join(","),
+      "--allowedTools", ...allowed,
+      "--disallowedTools", ...disallowed,
     ];
     const run = this.service.recordRun({
       taskId,
@@ -246,7 +389,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       status: "executando",
       prompt,
       worktreePath: workspace,
-      branch: null,
+      branch,
       command: [this.config.claudeBin, ...args.map((a) => (a === prompt ? "<prompt>" : a))],
       filesChanged: [],
       resultSummary: null,
@@ -256,7 +399,11 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     });
     const log = (message: string, level: "info" | "aviso" | "erro" = "info") =>
       this.service.addLog(task.agentId, message, AGENT, { taskId, level });
-    log("Execução iniciada (pasta isolada, ferramentas: " + ALLOWED_TOOLS.join(", ") + ").");
+    log(
+      isCode
+        ? `Execução iniciada na worktree ${workspace} (branch ${branch}). Comandos permitidos: testes, lint e git somente-leitura.`
+        : "Execução iniciada (pasta isolada, ferramentas: " + ALLOWED_TOOLS.join(", ") + ")."
+    );
 
     let child: ChildProcess;
     try {
@@ -339,7 +486,8 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     child.on("close", (code) => {
       clearTimeout(entry.timer);
       this.active.delete(taskId);
-      const files = this.listWorkspaceFiles(workspace);
+      // For FORJA the folder is a whole repository: changed files come from git instead.
+      const files = isCode ? [] : this.listWorkspaceFiles(workspace);
       const cost = costUsd !== null ? ` · custo informado: US$ ${costUsd.toFixed(4)}` : "";
       if (entry.cancelled) {
         this.finish(taskId, run.id, { ok: false, cancelled: true, code, files, summary: "Execução cancelada por você." });
@@ -354,6 +502,10 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       if (code === 0 && !isError && hasResult) {
         markWorking(); // a run that produced no stream events is still "trabalhando" -> "em_revisao"
         const content = fs.readFileSync(resultPath, "utf8");
+        if (isCode && branch) {
+          this.finishCode(taskId, run.id, { code, branch, workspace, summary: (resultText || "Concluído.").slice(0, 800) + cost, resultContent: content });
+          return;
+        }
         this.finish(taskId, run.id, {
           ok: true,
           code,
@@ -396,6 +548,51 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       // workspace removed
     }
     return out.slice(0, 200);
+  }
+
+  /** FORJA success: register the diff and ask for approval before any commit. */
+  private finishCode(
+    taskId: string,
+    runId: string,
+    outcome: { code: number | null; branch: string; workspace: string; summary: string; resultContent: string }
+  ) {
+    const log = (m: string, level: "info" | "aviso" | "erro" = "info") => this.service.addLog("forja", m, AGENT, { taskId, level });
+    let staged: { files: string[]; diff: string };
+    try {
+      staged = stageAndDiff(outcome.workspace);
+    } catch (error) {
+      this.finish(taskId, runId, { ok: false, code: outcome.code, summary: `Não foi possível ler as alterações: ${gitErrorMessage(error)}` });
+      return;
+    }
+    this.service.updateRun(runId, {
+      status: "concluido",
+      exitCode: outcome.code,
+      filesChanged: staged.files,
+      resultSummary: outcome.summary,
+      finishedAt: new Date().toISOString(),
+    });
+    this.service.addArtifact({ taskId, kind: "relatorio", title: "Resultado de FORJA (Claude Code)", content: outcome.resultContent }, AGENT);
+    if (staged.files.length === 0) {
+      log("Execução concluída sem alterações de código.");
+      this.safeTransition(taskId, "em_revisao", { note: "Nenhuma alteração de código foi feita" });
+      return;
+    }
+    this.service.addArtifact(
+      { taskId, kind: "diff", title: `Alterações propostas (${staged.files.length} arquivo(s))`, content: staged.diff.slice(0, 19_000) },
+      AGENT
+    );
+    log(`Alterações prontas na branch ${outcome.branch}: ${staged.files.join(", ")}. Aguardando sua aprovação para o commit.`);
+    this.service.requestApproval(
+      {
+        taskId,
+        action: "commit",
+        summary: `Criar commit com ${staged.files.length} arquivo(s) na branch ${outcome.branch}`,
+        details:
+          `Arquivos: ${staged.files.join(", ")}. O commit fica só no seu computador, na branch ${outcome.branch}. ` +
+          "Veja o diff em Artefatos antes de aprovar. Enviar ao GitHub (push) é uma aprovação separada.",
+      },
+      AGENT
+    );
   }
 
   private finish(

@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 import type { RuntimeMode } from "../../src/lib/savana/types";
 
@@ -9,7 +10,7 @@ export type SavanaConfig = {
   dbPath: string;
   demoStepMs: number;
   repoRoot: string | null;
-  worktreeRoot: string | null;
+  worktreeRoot: string;
   claudeCodeEnabled: boolean;
   /** Claude Code binary: a name looked up on PATH, or an absolute path. */
   claudeBin: string;
@@ -54,7 +55,8 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): SavanaConfig =
     dbPath: path.join(dataDir, dbFile),
     demoStepMs: Math.max(0, Number.parseInt(env.SAVANA_DEMO_STEP_MS ?? "3500", 10) || 0),
     repoRoot: env.SAVANA_REPO_ROOT?.trim() ? path.resolve(env.SAVANA_REPO_ROOT.trim()) : null,
-    worktreeRoot: env.SAVANA_WORKTREE_ROOT?.trim() ? path.resolve(env.SAVANA_WORKTREE_ROOT.trim()) : null,
+    // FORJA's isolated git worktrees live outside any repository by default.
+    worktreeRoot: path.resolve(env.SAVANA_WORKTREE_ROOT?.trim() || path.join(os.homedir(), "savana-worktrees")),
     claudeCodeEnabled: env.SAVANA_CLAUDE_CODE_ENABLED === "true",
     claudeBin: env.SAVANA_CLAUDE_BIN?.trim() || "claude",
     runTimeoutMs: Math.max(10_000, Number.parseInt(env.SAVANA_RUN_TIMEOUT_MS ?? "600000", 10) || 600_000),

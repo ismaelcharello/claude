@@ -196,6 +196,10 @@ export type Run = {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  /** FORJA: commit created by the backend after approval. */
+  commitSha: string | null;
+  /** FORJA: when the branch was pushed (after a separate approval). */
+  pushedAt: string | null;
 };
 
 export type TaskDetail = {

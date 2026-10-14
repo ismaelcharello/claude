@@ -256,6 +256,7 @@ if (briefing.includes("MODO:falha")) {
   process.exit(1);
 }
 out({ type: "assistant", message: { content: [{ type: "text", text: "Lendo o briefing" }, { type: "tool_use", name: "Write", input: { file_path: process.cwd() + "/resultado.md" } }] } });
+if (fs.existsSync(".git")) fs.writeFileSync("feature.txt", "nova funcionalidade\\n");
 if (!briefing.includes("MODO:sem-resultado")) fs.writeFileSync("resultado.md", "## Resumo\\nResultado de teste");
 out({ type: "result", subtype: "success", is_error: false, result: "Pronto", total_cost_usd: 0.0123 });
 `;
@@ -301,7 +302,7 @@ describe("execução real com Claude Code", () => {
     expect(detail.artifacts[0].content).toMatch(/Resultado de teste/);
     expect(detail.logs.some((l) => l.message.includes("Usando Write"))).toBe(true);
     const recorded = JSON.parse(fs.readFileSync(path.join(run.worktreePath!, ".args.json"), "utf8"));
-    expect(recorded.argv.join(" ")).toMatch(/--disallowedTools Bash,WebFetch,WebSearch/);
+    expect(recorded.argv.join(" ")).toMatch(/--disallowedTools Bash WebFetch WebSearch/);
     expect(recorded.env).not.toContain("SAVANA_TEST_SECRET");
   });
 
@@ -348,9 +349,87 @@ describe("execução real com Claude Code", () => {
     expect(run.resultSummary).toMatch(/Tempo-limite/);
   });
 
-  it("não executa FORJA nesta versão", () => {
+  it("FORJA sem repositório configurado não executa", () => {
     const app = makeRealApp();
     const task = app.service.createTask(input({ agentId: "forja" }));
-    expect(() => app.runtime.startRun!(task.id)).toThrow(/FORJA/);
+    expect(() => app.runtime.startRun!(task.id)).toThrow(/SAVANA_REPO_ROOT/);
+  });
+});
+
+import { execFileSync } from "node:child_process";
+
+const sh = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+
+const makeRepo = () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "savana-repo-"));
+  const origin = path.join(base, "origin.git");
+  const repo = path.join(base, "repo");
+  fs.mkdirSync(repo);
+  sh(base, "init", "--bare", "-q", origin);
+  sh(repo, "init", "-q", "-b", "main");
+  sh(repo, "config", "user.email", "teste@savana.local");
+  sh(repo, "config", "user.name", "Teste Savana");
+  fs.writeFileSync(path.join(repo, "README.md"), "# projeto\n");
+  fs.writeFileSync(path.join(repo, ".gitignore"), ".args.json\n"); // test-only file written by the fake CLI
+  sh(repo, "add", ".");
+  sh(repo, "commit", "-q", "-m", "inicial");
+  sh(repo, "remote", "add", "origin", origin);
+  return { base, repo, origin };
+};
+
+describe("FORJA com worktree e aprovação de commit/push", () => {
+  it("trabalha numa worktree isolada e só faz commit/push depois de aprovado", async () => {
+    const { base, repo, origin } = makeRepo();
+    const app = makeRealApp({ SAVANA_REPO_ROOT: repo, SAVANA_WORKTREE_ROOT: path.join(base, "worktrees") });
+    expect(app.service.getRuntimeInfo().runnableAgents).toContain("forja");
+    const task = app.service.createTask(input({ agentId: "forja", title: "Adicionar funcionalidade", briefing: "Criar o arquivo de funcionalidade de teste." }));
+    app.runtime.startRun!(task.id);
+    const run = await waitRunEnd(app, task.id);
+    expect(run.status).toBe("concluido");
+    expect(run.branch).toMatch(/^savana\/forja\//);
+    expect(run.filesChanged).toEqual(["feature.txt"]); // BRIEFING.md e resultado.md nunca entram
+
+    // a ferramenta de shell do agente está restrita
+    const argv = JSON.parse(fs.readFileSync(path.join(run.worktreePath!, ".args.json"), "utf8")).argv.join(" ");
+    expect(argv).toMatch(/Bash\(git commit:\*\)/);
+    expect(argv).toMatch(/Bash\(npm test:\*\)/);
+
+    // nada foi commitado ainda; o repositório principal está intocado
+    let detail = app.service.getTaskDetail(task.id);
+    expect(detail.task.status).toBe("aguardando_aprovacao");
+    expect(detail.artifacts.some((a) => a.kind === "diff" && a.content.includes("feature.txt"))).toBe(true);
+    expect(sh(repo, "log", "--oneline", run.branch!).split("\n")).toHaveLength(1);
+    expect(fs.existsSync(path.join(repo, "feature.txt"))).toBe(false);
+
+    // aprovar o commit
+    const commitApproval = detail.approvals.find((a) => a.action === "commit")!;
+    app.service.resolveApproval(commitApproval.id, "aprovada");
+    detail = app.service.getTaskDetail(task.id);
+    expect(detail.task.status).toBe("em_revisao");
+    expect(detail.runs[0].commitSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(sh(repo, "show", "--name-only", "--format=%s", run.branch!)).toMatch(/savana\(forja\): Adicionar funcionalidade[\s\S]*feature.txt/);
+    expect(sh(repo, "show", "--name-only", "--format=", run.branch!)).not.toMatch(/resultado.md|BRIEFING.md/);
+    expect(sh(repo, "rev-parse", "--abbrev-ref", "HEAD")).toBe("main");
+
+    // push exige outra aprovação e só envia a branch do FORJA
+    expect(() => sh(origin, "rev-parse", "--verify", run.branch!)).toThrow();
+    const pushApproval = app.runtime.requestPush!(task.id);
+    expect(app.service.getTask(task.id).status).toBe("em_revisao");
+    app.service.resolveApproval(pushApproval.id, "aprovada");
+    expect(sh(origin, "rev-parse", run.branch!)).toBe(app.service.getTaskDetail(task.id).runs[0].commitSha);
+    expect(() => sh(origin, "rev-parse", "--verify", "main")).toThrow();
+    expect(app.service.getTaskDetail(task.id).runs[0].pushedAt).not.toBeNull();
+  });
+
+  it("rejeitar o commit bloqueia a tarefa sem criar commit", async () => {
+    const { base, repo } = makeRepo();
+    const app = makeRealApp({ SAVANA_REPO_ROOT: repo, SAVANA_WORKTREE_ROOT: path.join(base, "worktrees") });
+    const task = app.service.createTask(input({ agentId: "forja", briefing: "Criar o arquivo de funcionalidade de teste." }));
+    app.runtime.startRun!(task.id);
+    const run = await waitRunEnd(app, task.id);
+    const approval = app.service.getTaskDetail(task.id).approvals[0];
+    app.service.resolveApproval(approval.id, "rejeitada", { note: "Refazer com testes" });
+    expect(app.service.getTask(task.id).status).toBe("bloqueado");
+    expect(sh(repo, "log", "--oneline", run.branch!).split("\n")).toHaveLength(1);
   });
 });

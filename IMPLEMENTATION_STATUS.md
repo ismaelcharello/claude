@@ -43,7 +43,7 @@ Ativado só com `npm run savana:demo` (ou `SAVANA_RUNTIME=demo`).
 - Usa um banco separado (`data/savana-demo.db`) e configurações de Studio separadas (`data/studio-demo`), então nunca se mistura com dados reais.
 - O chat do escritório nesse modo devolve respostas pré-programadas, identificadas como tal.
 
-## 3. Execução real com Claude Code ✅ (NEXO, ATLAS, LUME, PULSO)
+## 3. Execução real com Claude Code ✅ (todos os agentes)
 
 Iniciar com `npm run savana:ia` (equivale a `SAVANA_RUNTIME=claude-code` + `SAVANA_CLAUDE_CODE_ENABLED=true`).
 
@@ -56,13 +56,24 @@ Iniciar com `npm run savana:ia` (equivale a `SAVANA_RUNTIME=claude-code` + `SAVA
 - **Controles**: cancelar a qualquer momento; tempo-limite (`SAVANA_RUN_TIMEOUT_MS`, padrão 10 min); limite de turnos (`SAVANA_MAX_TURNS`, padrão 25); uma execução por tarefa; execuções interrompidas por reinício do servidor são marcadas como falha.
 - **Testes**: executor coberto com um binário `claude` falso (sucesso, falha, sem resultado, cancelamento, tempo-limite, duplicidade, FORJA bloqueado, segredo não vazado). Nenhum teste chamou o modelo real.
 
+### FORJA (código) ✅
+
+Requer `SAVANA_REPO_ROOT` (repositório Git) no `.env`. Worktrees em `SAVANA_WORKTREE_ROOT` (padrão `~/savana-worktrees`, fora do repositório).
+
+- Cada tarefa ganha uma **git worktree isolada** numa branch própria `savana/forja/<id>`, criada a partir do `HEAD` do repositório. O checkout principal não é alterado. `node_modules` do repositório é reaproveitado por link simbólico para os testes rodarem sem rede.
+- Ferramentas do FORJA: arquivos + apenas `npm test`, `npm run test|lint|typecheck`, `npx vitest`, `npx tsc`, `git status|diff|log`, `ls`. Bloqueados explicitamente: `git commit|push|reset|checkout`, `rm`, `curl`, `npm install`, web e sub-agentes.
+- Ao terminar: o backend coloca as mudanças em stage (excluindo `BRIEFING.md`, `resultado.md`, `node_modules`), registra o **diff como artefato** e cria uma **aprovação de commit**. A tarefa fica em "aguardando aprovação".
+- **Commit** é feito pelo backend só depois do "Aprovar" (`savana(forja): <título>`), na branch da tarefa; a tarefa vai para "Em revisão". Rejeitar bloqueia a tarefa sem commit; executar de novo reaproveita a worktree.
+- **Push** é outra aprovação ("Solicitar push para o GitHub"), envia **somente** a branch `savana/forja/*` para `origin` com as credenciais Git do computador. Merge na branch principal continua manual (pull request).
+- Testes com repositório Git real + remoto local: worktree, diff sem arquivos do runtime, `main` intocada, commit só após aprovação, push só da branch, rejeição sem commit.
+
 ## 4. O que ainda falta ⏳
 
-1. **Primeiro teste com o Claude Code real no Mac do Ismael** (instalação + login + `npm run savana:ia` + tarefa inofensiva). O executor só foi testado com o binário falso neste ambiente.
-2. **FORJA (código)**: criar/remover worktree Git isolada a partir do plano já existente (`planWorktree`), liberar `Bash` restrito a comandos de teste, e transformar commit/push em ações executadas **pelo backend** somente após aprovação.
-3. **Ponte de aprovação durante a execução** (pausar o agente e retomar após decisão). Hoje as ações sensíveis simplesmente não estão disponíveis ao agente.
-4. **Anexos**: permitir colocar documentos de entrada na pasta da tarefa pela interface (hoje o insumo é o briefing).
-5. **Autenticação** da interface antes de qualquer uso fora de `localhost`.
+1. Primeiro uso real no Mac do Ismael (o executor foi testado aqui com um binário `claude` falso).
+2. Pausar o agente no meio da execução para pedir aprovação e retomar (hoje as ações sensíveis não estão disponíveis ao agente e o commit/push são pedidos ao final).
+3. Limpeza de worktrees antigas pela interface.
+4. Anexos de entrada pela interface.
+5. Autenticação antes de qualquer uso fora de `localhost`.
 
 ## 5. Limitações conhecidas
 

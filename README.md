@@ -50,7 +50,7 @@ Estados de agente: offline, disponível, preparando, trabalhando, bloqueado, agu
 | --- | --- | --- |
 | Runtime não configurado | `npm run savana` (padrão) | Tarefas, aprovações e histórico funcionam e persistem. Nenhum agente executa nada; a tarefa registra isso honestamente. |
 | Demonstração | `npm run savana:demo` | Um roteiro fixo move as tarefas pelos estados. Tudo é marcado **SIMULADO** e fica em `data/savana-demo.db`. |
-| Com IA (Claude Code) | `npm run savana:ia` | NEXO, ATLAS, LUME e PULSO executam de verdade quando você clica em "Executar com IA", numa pasta isolada, sem terminal nem internet; o resultado volta para revisão. FORJA (código) ainda não. Requer Claude Code instalado e logado. |
+| Com IA (Claude Code) | `npm run savana:ia` | Os agentes executam de verdade quando você clica em "Executar com IA", em pasta isolada; o resultado volta para revisão. FORJA trabalha numa worktree Git isolada (`SAVANA_REPO_ROOT` no `.env`) e commit/push só acontecem após sua aprovação. Requer Claude Code instalado e logado. |
 
 Detalhes, limites e o caminho para agentes reais: [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md).
 

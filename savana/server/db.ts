@@ -104,6 +104,11 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX runs_task ON runs(task_id);
   `,
+  // 2: FORJA code runs — commit and push are recorded after human approval.
+  `
+  ALTER TABLE runs ADD COLUMN commit_sha TEXT;
+  ALTER TABLE runs ADD COLUMN pushed_at TEXT;
+  `,
 ];
 
 export const openDatabase = (dbPath: string): SavanaDb => {

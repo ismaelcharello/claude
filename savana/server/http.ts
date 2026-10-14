@@ -159,6 +159,16 @@ export const createApiHandler = (service: SavanaService, runtime?: AgentRuntime)
     runtime.cancelRun(params.id);
     return { ok: true };
   });
+  add(
+    "POST",
+    "/api/tasks/:id/push-request",
+    async ({ params, body }) => {
+      await body();
+      if (!runtime?.requestPush) throw new SavanaError("O runtime atual não envia código.", 409, "runtime_unavailable");
+      return runtime.requestPush(params.id);
+    },
+    201
+  );
   add("GET", "/api/approvals", ({ query }) => {
     const status = query.get("status") ?? undefined;
     if (status && !["pendente", "aprovada", "rejeitada"].includes(status)) {

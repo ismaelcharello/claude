@@ -70,6 +70,8 @@ export const savanaApi = {
     request<Run>(`/tasks/${encodeURIComponent(id)}/run`, { method: "POST", body: {} }),
   cancelRun: (id: string) =>
     request<{ ok: boolean }>(`/tasks/${encodeURIComponent(id)}/run/cancel`, { method: "POST", body: {} }),
+  requestPush: (id: string) =>
+    request<Approval>(`/tasks/${encodeURIComponent(id)}/push-request`, { method: "POST", body: {} }),
   decide: (id: string, decision: "aprovada" | "rejeitada", note?: string) =>
     request<Approval>(`/approvals/${encodeURIComponent(id)}/decision`, {
       method: "POST",
